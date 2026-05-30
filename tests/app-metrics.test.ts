@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { AppMetrics } from '../src/app-metrics.js';
+import { AppMetrics, createEmptyAppMetricsSnapshot } from '../src/app-metrics.js';
 
 describe('AppMetrics', () => {
     it('should compute success, failure, cache, and api call rates from counters', () => {
@@ -23,6 +23,9 @@ describe('AppMetrics', () => {
             translationFailureRate: 1 / 3,
             translationCacheHitRate: 0.5,
             translationApiCallRate: 0.5,
+            providers: {},
+            providerFallbackTotal: 0,
+            lastProviderFallback: null,
         });
     });
 
@@ -40,6 +43,71 @@ describe('AppMetrics', () => {
             translationFailureRate: 0,
             translationCacheHitRate: 0,
             translationApiCallRate: 0,
+            providers: {},
+            providerFallbackTotal: 0,
+            lastProviderFallback: null,
+        });
+    });
+
+    it('should return isolated provider objects for empty snapshots', () => {
+        const firstSnapshot = createEmptyAppMetricsSnapshot();
+        const secondSnapshot = createEmptyAppMetricsSnapshot();
+
+        firstSnapshot.providers.vertex = {
+            successTotal: 1,
+            failureTotal: 0,
+            fallbackFromTotal: 0,
+            fallbackToTotal: 0,
+            lastLatencyMs: 120,
+            lastErrorType: null,
+            lastError: null,
+        };
+
+        expect(secondSnapshot.providers).toEqual({});
+    });
+
+    it('should record provider success, failure, and fallback metrics', () => {
+        const metrics = new AppMetrics();
+
+        metrics.recordProviderSuccess('vertex', { latencyMs: 120 });
+        metrics.recordProviderFailure('vertex', {
+            errorType: 'rate_limit',
+            error: 'Vertex AI 429',
+        });
+        metrics.recordProviderFallback({
+            from: 'vertex',
+            to: 'openai',
+            errorType: 'rate_limit',
+            error: 'Vertex AI 429',
+        });
+        metrics.recordProviderSuccess('openai', { latencyMs: 80 });
+
+        const snapshot = metrics.snapshot();
+
+        expect(snapshot.providers.vertex).toMatchObject({
+            successTotal: 1,
+            failureTotal: 1,
+            fallbackFromTotal: 1,
+            fallbackToTotal: 0,
+            lastLatencyMs: 120,
+            lastErrorType: 'rate_limit',
+            lastError: 'Vertex AI 429',
+        });
+        expect(snapshot.providers.openai).toMatchObject({
+            successTotal: 1,
+            failureTotal: 0,
+            fallbackFromTotal: 0,
+            fallbackToTotal: 1,
+            lastLatencyMs: 80,
+            lastErrorType: null,
+            lastError: null,
+        });
+        expect(snapshot.providerFallbackTotal).toBe(1);
+        expect(snapshot.lastProviderFallback).toMatchObject({
+            from: 'vertex',
+            to: 'openai',
+            errorType: 'rate_limit',
+            error: 'Vertex AI 429',
         });
     });
 });
