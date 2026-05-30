@@ -8,6 +8,224 @@ function formatRatio(value) {
     return (Number(value || 0) * 100).toFixed(1) + '%';
 }
 
+function formatOpsNumber(value) {
+    return Number(value || 0).toLocaleString();
+}
+
+function setStatusPillClass(element, status) {
+    element.className = 'operations-pill';
+    if (status) element.classList.add(status);
+}
+
+function createOpsMetric(label, value) {
+    const metric = document.createElement('div');
+    metric.className = 'operations-metric';
+
+    const labelEl = document.createElement('span');
+    labelEl.className = 'operations-metric-label';
+    labelEl.textContent = label;
+
+    const valueEl = document.createElement('strong');
+    valueEl.textContent = value;
+
+    metric.append(labelEl, valueEl);
+    return metric;
+}
+
+function renderGuildBudgetOverview(container, guilds) {
+    container.replaceChildren();
+
+    guilds.forEach((guild) => {
+        const item = document.createElement('div');
+        item.className = 'guild-budget-overview-item';
+
+        const name = document.createElement('span');
+        name.className = 'gbo-name';
+        name.textContent = guild.name || 'Unknown server';
+        if (!guild.isCustom && guild.budget > 0) {
+            const tag = document.createElement('span');
+            tag.className = 'gbo-tag';
+            tag.textContent = 'global';
+            name.append(' ', tag);
+        }
+
+        const cost = document.createElement('span');
+        cost.className = 'gbo-cost';
+
+        if (guild.budget <= 0) {
+            cost.textContent =
+                formatUsd(guild.totalCost) + ' · ' + formatOpsNumber(guild.requests) + ' req';
+
+            const limit = document.createElement('span');
+            limit.className = 'gbo-limit';
+            limit.textContent = 'Unlimited';
+
+            item.append(name, cost, limit);
+            container.append(item);
+            return;
+        }
+
+        cost.textContent = formatUsd(guild.totalCost) + ' / ' + formatUsd(guild.budget);
+
+        const rawPct = (Number(guild.totalCost || 0) / Number(guild.budget || 1)) * 100;
+        const pct = Number.isFinite(rawPct) ? Math.min(Math.max(rawPct, 0), 100) : 0;
+        const bar = document.createElement('div');
+        bar.className = 'gbo-bar';
+
+        const fill = document.createElement('div');
+        fill.className = 'fill';
+        if (pct > 90) {
+            fill.classList.add('danger');
+        } else if (pct > 60) {
+            fill.classList.add('warning');
+        }
+        fill.style.width = pct + '%';
+        bar.append(fill);
+
+        item.append(name, cost, bar);
+
+        if (guild.exceeded) {
+            const exceeded = document.createElement('span');
+            exceeded.className = 'gbo-exceeded';
+            exceeded.textContent = 'EXCEEDED';
+            item.append(exceeded);
+        }
+
+        container.append(item);
+    });
+}
+
+function renderProviderCard(id, label, providerKey, provider, fallbackTotal, lastFallback) {
+    const card = document.getElementById(id);
+    if (!card) return;
+
+    const data = provider || {};
+    const enabled = Boolean(data.enabled);
+    const configured = Boolean(data.configured);
+    const status = enabled && configured ? 'ok' : enabled ? 'warn' : 'muted';
+    const lastFallbackText =
+        lastFallback && (lastFallback.from === providerKey || lastFallback.to === providerKey)
+            ? 'Last fallback: ' + lastFallback.from + ' to ' + lastFallback.to
+            : 'No recent fallback';
+
+    card.replaceChildren();
+
+    const header = document.createElement('div');
+    header.className = 'operations-card-header';
+
+    const title = document.createElement('h3');
+    title.textContent = label;
+
+    const pill = document.createElement('span');
+    setStatusPillClass(pill, status);
+    pill.textContent = enabled ? (configured ? 'Ready' : 'Setup needed') : 'Disabled';
+
+    header.append(title, pill);
+
+    const metrics = document.createElement('div');
+    metrics.className = 'operations-metrics';
+    metrics.append(
+        createOpsMetric('Successes', formatOpsNumber(data.successTotal)),
+        createOpsMetric('Failures', formatOpsNumber(data.failureTotal)),
+        createOpsMetric('Fallback from', formatOpsNumber(data.fallbackFromTotal)),
+        createOpsMetric('Fallback to', formatOpsNumber(data.fallbackToTotal)),
+    );
+
+    const sub = document.createElement('div');
+    sub.className = 'operations-card-sub';
+    sub.textContent =
+        'Fallback attempts: ' + formatOpsNumber(fallbackTotal) + ' · ' + lastFallbackText;
+
+    card.append(header, metrics, sub);
+}
+
+function renderOperations(operations) {
+    const ops = operations || {};
+    const providers = ops.providers || {};
+    const runtimePressure = ops.runtimePressure || {};
+    const budgetRisk = ops.budgetRisk || {};
+    const lastFallback = ops.lastFallback || null;
+    const fallbackTotal = ops.fallbackTotal;
+
+    const modeEl = document.getElementById('ops-provider-mode');
+    if (modeEl) {
+        modeEl.textContent = ops.providerMode || '-';
+    }
+
+    renderProviderCard(
+        'ops-provider-vertex',
+        'Vertex AI',
+        'vertex',
+        providers.vertex || {},
+        fallbackTotal,
+        lastFallback,
+    );
+    renderProviderCard(
+        'ops-provider-openai',
+        'OpenAI-compatible',
+        'openai',
+        providers.openai || {},
+        fallbackTotal,
+        lastFallback,
+    );
+
+    const runtimeEl = document.getElementById('ops-runtime');
+    if (runtimeEl) {
+        runtimeEl.replaceChildren();
+
+        const header = document.createElement('div');
+        header.className = 'operations-card-header';
+
+        const title = document.createElement('h3');
+        title.textContent = 'Runtime';
+
+        const pressure = Number(runtimePressure.inflight || 0) + Number(runtimePressure.queued || 0);
+        const pill = document.createElement('span');
+        setStatusPillClass(pill, pressure > 0 ? 'warn' : 'ok');
+        pill.textContent = pressure > 0 ? 'Busy' : 'Clear';
+
+        header.append(title, pill);
+
+        const metrics = document.createElement('div');
+        metrics.className = 'operations-metrics';
+        metrics.append(
+            createOpsMetric('Inflight', formatOpsNumber(runtimePressure.inflight)),
+            createOpsMetric('Queued', formatOpsNumber(runtimePressure.queued)),
+            createOpsMetric('Rejected', formatOpsNumber(runtimePressure.rejectedTotal)),
+        );
+
+        runtimeEl.append(header, metrics);
+    }
+
+    const budgetEl = document.getElementById('ops-budget-risk');
+    if (budgetEl) {
+        budgetEl.replaceChildren();
+
+        const header = document.createElement('div');
+        header.className = 'operations-card-header';
+
+        const title = document.createElement('h3');
+        title.textContent = 'Budget Risk';
+
+        const exceeded = Number(budgetRisk.exceededCount || 0);
+        const warnings = Number(budgetRisk.warningCount || 0);
+        const pill = document.createElement('span');
+        setStatusPillClass(pill, exceeded > 0 ? 'danger' : warnings > 0 ? 'warn' : 'ok');
+        pill.textContent = exceeded > 0 ? 'Exceeded' : warnings > 0 ? 'Warning' : 'Normal';
+
+        header.append(title, pill);
+
+        const metrics = document.createElement('div');
+        metrics.className = 'operations-metrics';
+        metrics.append(
+            createOpsMetric('Warnings', formatOpsNumber(warnings)),
+            createOpsMetric('Exceeded', formatOpsNumber(exceeded)),
+        );
+
+        budgetEl.append(header, metrics);
+    }
+}
+
 function switchTab(name) {
     document.querySelectorAll('.tab-btn').forEach((b) => b.classList.remove('active'));
     document.querySelectorAll('.tab-content').forEach((c) => c.classList.remove('active'));
@@ -30,6 +248,8 @@ async function loadStats() {
         document.getElementById('bot-tag').textContent = d.bot.name;
         if (d.bot.avatar) document.getElementById('bot-avatar').src = d.bot.avatar;
 
+        renderOperations(d.operations);
+
         // Cost card
         document.getElementById('stat-cost').textContent = formatUsd(d.usage.totalCost);
         const parts = [];
@@ -50,27 +270,9 @@ async function loadStats() {
 
             const container = document.getElementById('guild-budget-overview');
             if (guilds.length > 0) {
-                container.innerHTML = guilds
-                    .map((g) => {
-                        if (g.budget <= 0) {
-                            return `<div class="guild-budget-overview-item">
-              <span class="gbo-name">${g.name}</span>
-              <span class="gbo-cost">${formatUsd(g.totalCost)} · ${g.requests} req</span>
-              <span class="gbo-limit">Unlimited</span>
-            </div>`;
-                        }
-                        const pct = Math.min((g.totalCost / g.budget) * 100, 100);
-                        const barClass = pct > 90 ? ' danger' : pct > 60 ? ' warning' : '';
-                        return `<div class="guild-budget-overview-item">
-            <span class="gbo-name">${g.name}${g.isCustom ? '' : ' <span class="gbo-tag">global</span>'}</span>
-            <span class="gbo-cost">${formatUsd(g.totalCost)} / ${formatUsd(g.budget)}</span>
-            <div class="gbo-bar"><div class="fill${barClass}" style="width:${pct}%"></div></div>
-            ${g.exceeded ? '<span class="gbo-exceeded">EXCEEDED</span>' : ''}
-          </div>`;
-                    })
-                    .join('');
+                renderGuildBudgetOverview(container, guilds);
             } else {
-                container.innerHTML = '';
+                container.replaceChildren();
             }
         } else {
             budgetCard.style.display = 'none';
