@@ -136,6 +136,10 @@ export interface ErrorLogEntry {
     userTag: string;
     error: string;
     command: string;
+    requestId?: string;
+    provider?: string;
+    errorType?: string;
+    suggestedAction?: string;
     timestamp: number;
 }
 

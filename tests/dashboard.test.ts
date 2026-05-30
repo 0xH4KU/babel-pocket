@@ -169,6 +169,7 @@ describe('Dashboard API', () => {
     let csrfToken: string;
     let healthCheck: ReturnType<typeof vi.fn>;
     let runtimeLimiter: TranslationRuntimeLimiter;
+    let log: TranslationLog;
 
     beforeAll(async () => {
         cache = new TranslationCache(100);
@@ -181,7 +182,7 @@ describe('Dashboard API', () => {
         });
         healthCheck = vi.fn().mockResolvedValue({ healthy: true, latencyMs: 24 });
         const cooldown = new CooldownManager(5);
-        const log = new TranslationLog(100);
+        log = new TranslationLog(100);
         const guilds = [
             { id: 'guild-1', name: 'Guild One', iconURL: () => '', memberCount: 10 },
             { id: 'guild-2', name: 'Guild Two', iconURL: () => '', memberCount: 20 },
@@ -476,6 +477,118 @@ describe('Dashboard API', () => {
         });
         expect(res.status).toBe(200);
         expect(Array.isArray(res.body)).toBe(true);
+    });
+
+    it('should filter error logs by error type before applying count', async () => {
+        const rateLimitError = 'unique-rate-limit-before-count';
+        const authError = 'unique-auth-before-count';
+        log.addError({
+            guildId: 'guild-1',
+            userId: 'user-1',
+            error: rateLimitError,
+            command: 'translate',
+            errorType: 'rate_limit',
+        });
+        log.addError({
+            guildId: 'guild-1',
+            userId: 'user-1',
+            error: authError,
+            command: 'translate',
+            errorType: 'auth',
+        });
+        log.add({
+            guildId: 'guild-1',
+            userId: 'user-1',
+            userTag: 'User#0001',
+            contentPreview: 'hello',
+        });
+
+        const res = await request(
+            server,
+            'GET',
+            '/api/logs?count=1&filter=error&errorType=rate_limit',
+            {
+                cookie: sessionCookie,
+            },
+        );
+
+        expect(res.status).toBe(200);
+        const entries = res.body as Array<Record<string, unknown>>;
+        expect(entries.length).toBeGreaterThan(0);
+        expect(entries.every((entry) => entry.type === 'error')).toBe(true);
+        expect(entries.every((entry) => entry.errorType === 'rate_limit')).toBe(true);
+        expect(entries).toEqual(
+            expect.arrayContaining([
+                expect.objectContaining({
+                    error: rateLimitError,
+                    errorType: 'rate_limit',
+                }),
+            ]),
+        );
+        expect(entries).not.toEqual(
+            expect.arrayContaining([
+                expect.objectContaining({
+                    error: authError,
+                }),
+            ]),
+        );
+    });
+
+    it('should filter error logs by error type when filter is omitted', async () => {
+        const rateLimitError = 'unique-rate-limit-without-filter';
+        const authError = 'unique-auth-without-filter';
+        log.addError({
+            guildId: 'guild-1',
+            userId: 'user-1',
+            error: rateLimitError,
+            command: 'translate',
+            errorType: 'rate_limit',
+        });
+        log.addError({
+            guildId: 'guild-1',
+            userId: 'user-1',
+            error: authError,
+            command: 'translate',
+            errorType: 'auth',
+        });
+
+        const res = await request(server, 'GET', '/api/logs?errorType=rate_limit', {
+            cookie: sessionCookie,
+        });
+
+        expect(res.status).toBe(200);
+        const entries = res.body as Array<Record<string, unknown>>;
+        expect(entries.length).toBeGreaterThan(0);
+        expect(entries.every((entry) => entry.type === 'error')).toBe(true);
+        expect(entries.every((entry) => entry.errorType === 'rate_limit')).toBe(true);
+        expect(entries).toEqual(
+            expect.arrayContaining([
+                expect.objectContaining({
+                    error: rateLimitError,
+                }),
+            ]),
+        );
+        expect(entries).not.toEqual(
+            expect.arrayContaining([
+                expect.objectContaining({
+                    error: authError,
+                }),
+            ]),
+        );
+    });
+
+    it('should reject contradictory log type and error type filters', async () => {
+        const res = await request(
+            server,
+            'GET',
+            '/api/logs?filter=translation&errorType=rate_limit',
+            {
+                cookie: sessionCookie,
+            },
+        );
+
+        expect(res.status).toBe(400);
+        expect(res.body).toEqual({ error: 'errorType filter requires error logs' });
     });
 
     // --- Logout ---

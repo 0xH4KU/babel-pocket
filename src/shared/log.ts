@@ -52,6 +52,10 @@ export class TranslationLog {
         userTag?: string;
         error: string;
         command?: string;
+        requestId?: string;
+        provider?: string;
+        errorType?: string;
+        suggestedAction?: string;
         timestamp?: number;
     }): void {
         this._errorCount++;
@@ -63,6 +67,10 @@ export class TranslationLog {
             userTag: params.userTag || params.userId || 'Unknown',
             error: String(params.error).slice(0, 200),
             command: params.command || 'unknown',
+            requestId: params.requestId,
+            provider: params.provider,
+            errorType: params.errorType,
+            suggestedAction: params.suggestedAction,
             timestamp: params.timestamp || Date.now(),
         });
     }

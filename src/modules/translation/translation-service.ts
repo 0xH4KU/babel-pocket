@@ -136,6 +136,39 @@ function createTranslatorOptions(
     return { logContext };
 }
 
+function classifyTranslationError(message: string): { errorType: string; suggestedAction: string } {
+    if (/429|rate/i.test(message)) {
+        return {
+            errorType: 'rate_limit',
+            suggestedAction:
+                'Provider rate limit reached. Try fallback mode or reduce concurrency.',
+        };
+    }
+    if (/401|403|auth|api key|not configured/i.test(message)) {
+        return {
+            errorType: 'auth',
+            suggestedAction: 'Check provider API key and provider configuration.',
+        };
+    }
+    if (/timeout|aborted/i.test(message)) {
+        return {
+            errorType: 'timeout',
+            suggestedAction: 'Provider timed out. Check provider status or use fallback mode.',
+        };
+    }
+    if (/budget/i.test(message)) {
+        return {
+            errorType: 'budget',
+            suggestedAction: 'Review global or server budget limits.',
+        };
+    }
+
+    return {
+        errorType: 'unknown',
+        suggestedAction: 'Check structured logs for this request id.',
+    };
+}
+
 export function createTranslationService({
     cache,
     cooldown,
@@ -392,23 +425,29 @@ export function createTranslationService({
             } catch (error) {
                 reservation?.cancel();
                 const message = (error as Error).message;
+                const sanitizedMessage = sanitizeError(message);
+                const diagnostic = classifyTranslationError(message);
                 metrics?.recordTranslationFailure();
                 log.addError({
                     guildId: request.guildId,
                     guildName: request.guildName,
                     userId: request.userId,
                     userTag: request.userTag,
-                    error: message,
+                    error: sanitizedMessage,
                     command: request.commandLabel,
+                    requestId,
+                    errorType: diagnostic.errorType,
+                    suggestedAction: diagnostic.suggestedAction,
                 });
                 requestLogger.error('translation.request.failed', {
-                    error: message,
+                    error: sanitizedMessage,
+                    errorType: diagnostic.errorType,
                 });
 
                 return {
                     status: 'error',
                     deferred,
-                    message: discordMessages.translationFailed(sanitizeError(message)),
+                    message: discordMessages.translationFailed(sanitizedMessage),
                 };
             }
         },
@@ -449,4 +488,8 @@ function resolveTargetLanguage(
     };
 }
 
-export const _test = { resolveTargetLanguage, resolveQueueBusyMessage };
+export const _test = {
+    resolveTargetLanguage,
+    resolveQueueBusyMessage,
+    classifyTranslationError,
+};

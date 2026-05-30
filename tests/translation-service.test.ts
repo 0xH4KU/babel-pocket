@@ -322,10 +322,10 @@ describe('TranslationService', () => {
         expect(metrics.snapshot().budgetExceededTotal).toBe(1);
     });
 
-    it('should return a sanitized error result when translation fails', async () => {
+    it('should return a sanitized error result and diagnostic log when translation fails', async () => {
         const translator = vi.fn(async () => {
             throw new Error(
-                'Vertex AI 500: https://example.com/projects/test-project/secret-token-value',
+                'Vertex AI 429 rate limit: https://example.com/projects/test-project/secret-token-value',
             );
         });
         const { service, log, metrics } = createService({ translator });
@@ -339,6 +339,7 @@ describe('TranslationService', () => {
             userTag: 'user#0001',
             locale: 'en-US',
             text: 'Hello world',
+            requestId: 'req-failure-1',
             beforeTranslate: async () => undefined,
         });
 
@@ -348,6 +349,20 @@ describe('TranslationService', () => {
             'https://example.com',
         );
         expect(log.errorCount).toBe(1);
+        const errorEntry = log.getRecent(1)[0];
+        expect(errorEntry).toMatchObject({
+            type: 'error',
+            requestId: 'req-failure-1',
+            errorType: 'rate_limit',
+            suggestedAction:
+                'Provider rate limit reached. Try fallback mode or reduce concurrency.',
+        });
+        expect(errorEntry.type === 'error' ? errorEntry.error : '').not.toContain(
+            'https://example.com',
+        );
+        expect(errorEntry.type === 'error' ? errorEntry.error : '').not.toContain(
+            'secret-token-value',
+        );
         expect(metrics.snapshot()).toMatchObject({
             translationApiCallsTotal: 1,
             translationFailuresTotal: 1,

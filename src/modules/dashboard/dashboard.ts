@@ -528,7 +528,23 @@ export function createDashboardApp({
     app.get('/api/logs', auth.requireAuth, (req: Request, res: Response) => {
         const count = Math.min(parseInt(req.query.count as string) || 50, 200);
         const filter = req.query.filter as string | undefined;
-        res.json(log.getRecent(count, filter));
+        const errorType = req.query.errorType as string | undefined;
+        if (errorType) {
+            if (filter && filter !== 'error') {
+                res.status(400).json({ error: 'errorType filter requires error logs' });
+                return;
+            }
+
+            const entries = log
+                .getRecent(log.size, 'error')
+                .filter((entry) => entry.type === 'error' && entry.errorType === errorType)
+                .slice(0, count);
+            res.json(entries);
+            return;
+        }
+
+        const entries = log.getRecent(count, filter);
+        res.json(entries);
     });
 
     app.get('/api/user-prefs', auth.requireAuth, (_req: Request, res: Response) => {
