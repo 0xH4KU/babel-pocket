@@ -6,6 +6,7 @@ import { createVertexAiProvider } from '../../infra/vertex-ai-client.js';
 import { createOpenAiProvider } from '../../infra/openai-client.js';
 import { configRepository } from '../config/config-repository.js';
 import type { StructuredLogFields } from '../../shared/structured-logger.js';
+import type { AppMetricsCollector } from '../../shared/app-metrics.js';
 import type { TranslationResult } from '../../types.js';
 import type { TranslationProvider } from '../../infra/provider-orchestrator.js';
 
@@ -115,6 +116,7 @@ export async function translate(
     targetLanguage: string = 'auto',
     options?: {
         logContext?: Pick<StructuredLogFields, 'requestId' | 'guildId' | 'userId' | 'command'>;
+        metrics?: AppMetricsCollector;
     },
 ): Promise<TranslationResult> {
     const config = configRepository.getRuntimeConfig();
@@ -123,7 +125,9 @@ export async function translate(
     const maxOutputTokens = config.maxOutputTokens || 1000;
     const mode = config.translationProvider || 'vertex';
 
-    const orchestrator = createProviderOrchestrator(mode, getProviders());
+    const orchestrator = createProviderOrchestrator(mode, getProviders(), {
+        metrics: options?.metrics,
+    });
     return orchestrator.translate(prompt, maxOutputTokens, options);
 }
 

@@ -1,5 +1,6 @@
 import type { StructuredLogFields } from '../shared/structured-logger.js';
 import { appLogger } from '../shared/structured-logger.js';
+import type { AppMetricsCollector } from '../shared/app-metrics.js';
 import type { TranslationProviderMode, TranslationResult } from '../types.js';
 
 export interface TranslateOptions {
@@ -26,6 +27,10 @@ export interface ProviderOrchestratorResult extends TranslationResult {
     fallback: boolean;
 }
 
+export interface ProviderOrchestratorOptions {
+    metrics?: AppMetricsCollector;
+}
+
 function resolveProviderOrder(
     mode: TranslationProviderMode,
     providers: Map<string, TranslationProvider>,
@@ -48,9 +53,20 @@ function resolveProviderOrder(
     }
 }
 
+export function classifyProviderError(error: Error | null): string {
+    const message = error?.message ?? '';
+    if (/429|rate/i.test(message)) return 'rate_limit';
+    if (/401|403|auth|api key|not configured/i.test(message)) return 'auth';
+    if (/timeout|aborted/i.test(message)) return 'timeout';
+    if (/5\d\d|server/i.test(message)) return 'server_error';
+    if (/budget/i.test(message)) return 'budget';
+    return 'unknown';
+}
+
 export function createProviderOrchestrator(
     mode: TranslationProviderMode,
     providers: Map<string, TranslationProvider>,
+    orchestratorOptions: ProviderOrchestratorOptions = {},
 ) {
     const logger = appLogger.child({ component: 'provider_orchestrator' });
 
@@ -77,6 +93,12 @@ export function createProviderOrchestrator(
 
                 try {
                     if (isFallback) {
+                        orchestratorOptions.metrics?.recordProviderFallback({
+                            from: configured[i - 1]!.name,
+                            to: provider.name,
+                            errorType: classifyProviderError(lastError),
+                            error: lastError?.message ?? 'Unknown provider failure',
+                        });
                         logger.warn('provider_orchestrator.fallback', {
                             from: configured[i - 1]!.name,
                             to: provider.name,
@@ -86,6 +108,7 @@ export function createProviderOrchestrator(
                     }
 
                     const result = await provider.translate(prompt, maxOutputTokens, options);
+                    orchestratorOptions.metrics?.recordProviderSuccess(provider.name);
                     return {
                         ...result,
                         provider: provider.name,
@@ -93,6 +116,10 @@ export function createProviderOrchestrator(
                     };
                 } catch (error) {
                     lastError = error as Error;
+                    orchestratorOptions.metrics?.recordProviderFailure(provider.name, {
+                        errorType: classifyProviderError(lastError),
+                        error: lastError.message,
+                    });
                     logger.error('provider_orchestrator.provider_failed', {
                         provider: provider.name,
                         error: lastError.message,

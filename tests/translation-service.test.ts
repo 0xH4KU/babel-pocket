@@ -177,14 +177,24 @@ describe('TranslationService', () => {
         expect(result.status === 'success' ? result.targetLanguage : '').toBe('ja');
         expect(result.status === 'success' ? result.langSource : '').toBe('setlang');
         expect(beforeTranslate).toHaveBeenCalledTimes(1);
-        expect(translator).toHaveBeenCalledWith('Hello world', 'ja', {
-            logContext: {
-                requestId: 'req-1',
-                guildId: 'guild-1',
-                userId: 'user1',
-                command: 'babel',
-            },
-        });
+        expect(translator).toHaveBeenCalledWith(
+            'Hello world',
+            'ja',
+            expect.objectContaining({
+                logContext: {
+                    requestId: 'req-1',
+                    guildId: 'guild-1',
+                    userId: 'user1',
+                    command: 'babel',
+                },
+            }),
+        );
+        const translatorOptions = translator.mock.calls[0]?.[2];
+        expect(Object.keys(translatorOptions ?? {})).toEqual(
+            expect.arrayContaining(['logContext', 'metrics']),
+        );
+        expect(Object.prototype.propertyIsEnumerable.call(translatorOptions, 'metrics')).toBe(true);
+        expect(translatorOptions?.metrics).toBe(metrics);
         expect(usageTracker.record).toHaveBeenCalledWith(12, 6, 'guild-1');
         expect(log.size).toBe(1);
         expect(stats.totalTranslations).toBe(1);

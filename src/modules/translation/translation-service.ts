@@ -26,6 +26,15 @@ import type { BotStats, TranslationResult } from '../../types.js';
 
 type ServiceCommand = 'babel' | 'translate';
 type LangSource = 'option' | 'setlang' | 'locale' | 'auto';
+type TranslatorOptions = {
+    metrics?: AppMetricsCollector;
+    logContext: {
+        requestId: string;
+        guildId?: string | null;
+        userId: string;
+        command: ServiceCommand;
+    };
+};
 
 interface ConfigRepositoryLike {
     getRuntimeConfig(): RuntimeConfig;
@@ -45,14 +54,7 @@ interface Translator {
     (
         text: string,
         targetLanguage?: string,
-        options?: {
-            logContext?: {
-                requestId: string;
-                guildId?: string | null;
-                userId: string;
-                command: ServiceCommand;
-            };
-        },
+        options?: TranslatorOptions,
     ): Promise<TranslationResult>;
 }
 
@@ -121,6 +123,17 @@ function resolveQueueBusyMessage(reason: RuntimeLimitReason, messages: QueueBusy
         case 'global_queue_full':
             return messages.serviceBusy;
     }
+}
+
+function createTranslatorOptions(
+    logContext: TranslatorOptions['logContext'],
+    metrics?: AppMetricsCollector,
+): TranslatorOptions {
+    if (metrics) {
+        return { logContext, metrics };
+    }
+
+    return { logContext };
 }
 
 export function createTranslationService({
@@ -302,14 +315,19 @@ export function createTranslationService({
 
                             stats.apiCalls++;
                             metrics?.recordTranslationApiCall();
-                            const result = await translator(originalText, targetLanguage, {
-                                logContext: {
-                                    requestId,
-                                    guildId: request.guildId ?? null,
-                                    userId: request.userId,
-                                    command: request.command,
-                                },
-                            });
+                            const result = await translator(
+                                originalText,
+                                targetLanguage,
+                                createTranslatorOptions(
+                                    {
+                                        requestId,
+                                        guildId: request.guildId ?? null,
+                                        userId: request.userId,
+                                        command: request.command,
+                                    },
+                                    metrics,
+                                ),
+                            );
                             cache.set(cacheKey, result.text);
                             usageTracker.record(
                                 result.inputTokens,
@@ -321,14 +339,19 @@ export function createTranslationService({
                     } else {
                         stats.apiCalls++;
                         metrics?.recordTranslationApiCall();
-                        const result = await translator(originalText, targetLanguage, {
-                            logContext: {
-                                requestId,
-                                guildId: request.guildId ?? null,
-                                userId: request.userId,
-                                command: request.command,
-                            },
-                        });
+                        const result = await translator(
+                            originalText,
+                            targetLanguage,
+                            createTranslatorOptions(
+                                {
+                                    requestId,
+                                    guildId: request.guildId ?? null,
+                                    userId: request.userId,
+                                    command: request.command,
+                                },
+                                metrics,
+                            ),
+                        );
                         translated = result.text;
                         cache.set(cacheKey, translated);
                         usageTracker.record(
