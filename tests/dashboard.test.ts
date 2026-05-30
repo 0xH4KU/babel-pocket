@@ -19,6 +19,10 @@ vi.mock('../src/store.js', () => {
         gcpProject: 'test-project',
         gcpLocation: 'global',
         geminiModel: 'gemini-2.5-flash-lite',
+        openaiApiKey: '',
+        openaiBaseUrl: '',
+        openaiModel: '',
+        translationProvider: 'vertex',
         allowedGuildIds: [],
         cooldownSeconds: 5,
         cacheMaxSize: 2000,
@@ -307,6 +311,61 @@ describe('Dashboard API', () => {
             (res.body!.runtime as Record<string, Record<string, unknown>>).limits.maxConcurrent,
         ).toBe(2);
         expect((res.body!.bot as Record<string, unknown>).memory).toBeDefined();
+    });
+
+    it('should include operations summary in stats', async () => {
+        metrics.recordProviderSuccess('vertex', { latencyMs: 42 });
+        metrics.recordProviderFailure('openai', {
+            errorType: 'configuration',
+            error: 'OpenAI provider is not configured',
+        });
+
+        const res = await request(server, 'GET', '/api/stats', {
+            cookie: sessionCookie,
+        });
+
+        expect(res.status).toBe(200);
+
+        const operations = res.body!.operations as Record<string, unknown>;
+        expect(operations.providerMode).toBe('vertex');
+
+        const providers = operations.providers as Record<string, Record<string, unknown>>;
+        expect(providers.vertex.enabled).toBe(true);
+        expect(providers.vertex.configured).toBe(true);
+        expect(providers.vertex.successTotal).toEqual(expect.any(Number));
+        expect(providers.vertex.failureTotal).toEqual(expect.any(Number));
+        expect(providers.openai.enabled).toBe(false);
+        expect(providers.openai.configured).toBe(false);
+        expect(providers.openai.failureTotal).toEqual(expect.any(Number));
+
+        const { store } = await import('../src/store.js');
+        const previousGcpProject = store.get('gcpProject');
+        try {
+            store.update({ gcpProject: '' });
+            const missingProjectRes = await request(server, 'GET', '/api/stats', {
+                cookie: sessionCookie,
+            });
+            const missingProjectOperations = missingProjectRes.body!.operations as Record<
+                string,
+                unknown
+            >;
+            const missingProjectProviders = missingProjectOperations.providers as Record<
+                string,
+                Record<string, unknown>
+            >;
+            expect(missingProjectProviders.vertex.configured).toBe(false);
+        } finally {
+            store.update({ gcpProject: previousGcpProject });
+        }
+
+        const runtimePressure = operations.runtimePressure as Record<string, unknown>;
+        expect(runtimePressure.inflight).toEqual(expect.any(Number));
+        expect(runtimePressure.queued).toEqual(expect.any(Number));
+        expect(runtimePressure.rejectedTotal).toEqual(expect.any(Number));
+
+        const budgetRisk = operations.budgetRisk as Record<string, unknown>;
+        expect(budgetRisk.warningCount).toEqual(expect.any(Number));
+        expect(budgetRisk.exceededCount).toEqual(expect.any(Number));
     });
 
     it('should expose readiness details on the authenticated health endpoint', async () => {
