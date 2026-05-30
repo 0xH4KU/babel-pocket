@@ -196,14 +196,47 @@
                         <span class="sub-info" id="log-count"></span>
                     </div>
                     <div class="log-filters">
-                        <button class="log-filter-btn active" onclick="setLogFilter(undefined)">
+                        <button
+                            class="log-filter-btn active"
+                            data-log-filter="all"
+                            onclick="setLogFilter(undefined)"
+                        >
                             All
                         </button>
-                        <button class="log-filter-btn" onclick="setLogFilter('translation')">
+                        <button
+                            class="log-filter-btn"
+                            data-log-filter="translation"
+                            onclick="setLogFilter('translation')"
+                        >
                             Translations
                         </button>
-                        <button class="log-filter-btn" onclick="setLogFilter('error')">
+                        <button
+                            class="log-filter-btn"
+                            data-log-filter="error"
+                            onclick="setLogFilter('error')"
+                        >
                             Errors
+                        </button>
+                        <button
+                            class="log-filter-btn"
+                            data-error-filter="rate_limit"
+                            onclick="setErrorTypeFilter('rate_limit')"
+                        >
+                            Rate Limit
+                        </button>
+                        <button
+                            class="log-filter-btn"
+                            data-error-filter="auth"
+                            onclick="setErrorTypeFilter('auth')"
+                        >
+                            Auth
+                        </button>
+                        <button
+                            class="log-filter-btn"
+                            data-error-filter="timeout"
+                            onclick="setErrorTypeFilter('timeout')"
+                        >
+                            Timeout
                         </button>
                     </div>
                     <div id="log-table-container">
