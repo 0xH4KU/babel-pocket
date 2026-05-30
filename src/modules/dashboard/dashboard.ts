@@ -1,7 +1,10 @@
 import express, { type Request, type Response } from 'express';
 import http from 'http';
 import rateLimit from 'express-rate-limit';
-import { createEmptyAppMetricsSnapshot } from '../../shared/app-metrics.js';
+import {
+    createEmptyAppMetricsSnapshot,
+    type ProviderMetricsSnapshot,
+} from '../../shared/app-metrics.js';
 import { getConfig } from '../config/config.js';
 import { getHealthStatus, getLivenessStatus, getReadinessStatus } from '../../shared/health.js';
 import { usage } from '../usage/usage.js';
@@ -19,11 +22,94 @@ import { appLogger } from '../../shared/structured-logger.js';
 import { dashboardMessages } from '../../shared/messages/dashboard-messages.js';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
-import type { DashboardDeps, StoreData } from '../../types.js';
+import type { DashboardDeps, StoreData, TranslationProviderMode } from '../../types.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const MAX_CACHE_SIZE = 2000;
 const BYTES_PER_MB = 1024 * 1024;
+const BUDGET_WARNING_THRESHOLD = 0.8;
+const EMPTY_PROVIDER_METRICS: ProviderMetricsSnapshot = {
+    successTotal: 0,
+    failureTotal: 0,
+    fallbackFromTotal: 0,
+    fallbackToTotal: 0,
+    lastLatencyMs: null,
+    lastErrorType: null,
+    lastError: null,
+};
+
+type BudgetRiskItem = {
+    id: string;
+    name: string;
+    budget: number;
+    totalCost: number;
+    usedPercent: number;
+};
+
+function providerModeIncludes(
+    mode: TranslationProviderMode,
+    provider: 'vertex' | 'openai',
+): boolean {
+    return mode.split('+').includes(provider);
+}
+
+function budgetRiskForGuilds(
+    guildBudgetList: Array<{
+        id: string;
+        name: string;
+        budget: number;
+        totalCost: number;
+        exceeded: boolean;
+    }>,
+): {
+    warningCount: number;
+    exceededCount: number;
+    warnings: BudgetRiskItem[];
+    exceeded: BudgetRiskItem[];
+} {
+    const warnings: BudgetRiskItem[] = [];
+    const exceeded: BudgetRiskItem[] = [];
+
+    for (const guildBudget of guildBudgetList) {
+        if (guildBudget.budget <= 0) {
+            continue;
+        }
+
+        const usedPercent = guildBudget.totalCost / guildBudget.budget;
+        const item = {
+            id: guildBudget.id,
+            name: guildBudget.name,
+            budget: guildBudget.budget,
+            totalCost: guildBudget.totalCost,
+            usedPercent,
+        };
+
+        if (guildBudget.exceeded) {
+            exceeded.push(item);
+        } else if (usedPercent >= BUDGET_WARNING_THRESHOLD) {
+            warnings.push(item);
+        }
+    }
+
+    return {
+        warningCount: warnings.length,
+        exceededCount: exceeded.length,
+        warnings,
+        exceeded,
+    };
+}
+
+function providerSummary(
+    metrics: Record<string, ProviderMetricsSnapshot>,
+    provider: 'vertex' | 'openai',
+    options: { enabled: boolean; configured: boolean },
+): ProviderMetricsSnapshot & { enabled: boolean; configured: boolean } {
+    return {
+        enabled: options.enabled,
+        configured: options.configured,
+        ...(metrics[provider] ?? EMPTY_PROVIDER_METRICS),
+    };
+}
 
 /** Wrap an async Express handler to forward errors to Express error handling (Express 4 compat). */
 function asyncHandler(
@@ -257,6 +343,8 @@ export function createDashboardApp({
             },
             limits: DEFAULT_TRANSLATION_RUNTIME_LIMITS,
         };
+        const runtimeConfig = configRepository.getRuntimeConfig();
+        const providerMode = runtimeConfig.translationProvider || 'vertex';
 
         const guildIds = client.guilds.cache.map((guild) => guild.id);
         const guildBudgetConfigs = guildBudgetRepository.listBudgets();
@@ -278,6 +366,35 @@ export function createDashboardApp({
                 exceeded: budget > 0 && totalCost >= budget,
             };
         });
+        const vertexEnabled = providerModeIncludes(providerMode, 'vertex');
+        const openAiEnabled = providerModeIncludes(providerMode, 'openai');
+        const operations = {
+            providerMode,
+            providers: {
+                vertex: providerSummary(metricsSnapshot.providers, 'vertex', {
+                    enabled: vertexEnabled,
+                    configured: Boolean(runtimeConfig.vertexAiApiKey && runtimeConfig.gcpProject),
+                }),
+                openai: providerSummary(metricsSnapshot.providers, 'openai', {
+                    enabled: openAiEnabled,
+                    configured: Boolean(
+                        runtimeConfig.openaiApiKey &&
+                        runtimeConfig.openaiBaseUrl &&
+                        runtimeConfig.openaiModel,
+                    ),
+                }),
+            },
+            fallbackTotal: metricsSnapshot.providerFallbackTotal,
+            lastFallback: metricsSnapshot.lastProviderFallback,
+            runtimePressure: {
+                inflight: runtimeSnapshot.inflight,
+                queued: runtimeSnapshot.queued,
+                rejectedTotal: runtimeSnapshot.rejectedTotal,
+                rejectionCounts: runtimeSnapshot.rejectionCounts,
+                limits: runtimeSnapshot.limits,
+            },
+            budgetRisk: budgetRiskForGuilds(guildBudgetList),
+        };
 
         res.json({
             bot: {
@@ -305,6 +422,7 @@ export function createDashboardApp({
             },
             metrics: metricsSnapshot,
             runtime: runtimeSnapshot,
+            operations,
             cache: cacheStats,
             usage: usageStats,
             guildBudgets: guildBudgetList,
@@ -410,7 +528,23 @@ export function createDashboardApp({
     app.get('/api/logs', auth.requireAuth, (req: Request, res: Response) => {
         const count = Math.min(parseInt(req.query.count as string) || 50, 200);
         const filter = req.query.filter as string | undefined;
-        res.json(log.getRecent(count, filter));
+        const errorType = req.query.errorType as string | undefined;
+        if (errorType) {
+            if (filter && filter !== 'error') {
+                res.status(400).json({ error: 'errorType filter requires error logs' });
+                return;
+            }
+
+            const entries = log
+                .getRecent(log.size, 'error')
+                .filter((entry) => entry.type === 'error' && entry.errorType === errorType)
+                .slice(0, count);
+            res.json(entries);
+            return;
+        }
+
+        const entries = log.getRecent(count, filter);
+        res.json(entries);
     });
 
     app.get('/api/user-prefs', auth.requireAuth, (_req: Request, res: Response) => {

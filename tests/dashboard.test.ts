@@ -19,6 +19,10 @@ vi.mock('../src/store.js', () => {
         gcpProject: 'test-project',
         gcpLocation: 'global',
         geminiModel: 'gemini-2.5-flash-lite',
+        openaiApiKey: '',
+        openaiBaseUrl: '',
+        openaiModel: '',
+        translationProvider: 'vertex',
         allowedGuildIds: [],
         cooldownSeconds: 5,
         cacheMaxSize: 2000,
@@ -165,6 +169,7 @@ describe('Dashboard API', () => {
     let csrfToken: string;
     let healthCheck: ReturnType<typeof vi.fn>;
     let runtimeLimiter: TranslationRuntimeLimiter;
+    let log: TranslationLog;
 
     beforeAll(async () => {
         cache = new TranslationCache(100);
@@ -177,7 +182,7 @@ describe('Dashboard API', () => {
         });
         healthCheck = vi.fn().mockResolvedValue({ healthy: true, latencyMs: 24 });
         const cooldown = new CooldownManager(5);
-        const log = new TranslationLog(100);
+        log = new TranslationLog(100);
         const guilds = [
             { id: 'guild-1', name: 'Guild One', iconURL: () => '', memberCount: 10 },
             { id: 'guild-2', name: 'Guild Two', iconURL: () => '', memberCount: 20 },
@@ -309,6 +314,61 @@ describe('Dashboard API', () => {
         expect((res.body!.bot as Record<string, unknown>).memory).toBeDefined();
     });
 
+    it('should include operations summary in stats', async () => {
+        metrics.recordProviderSuccess('vertex', { latencyMs: 42 });
+        metrics.recordProviderFailure('openai', {
+            errorType: 'configuration',
+            error: 'OpenAI provider is not configured',
+        });
+
+        const res = await request(server, 'GET', '/api/stats', {
+            cookie: sessionCookie,
+        });
+
+        expect(res.status).toBe(200);
+
+        const operations = res.body!.operations as Record<string, unknown>;
+        expect(operations.providerMode).toBe('vertex');
+
+        const providers = operations.providers as Record<string, Record<string, unknown>>;
+        expect(providers.vertex.enabled).toBe(true);
+        expect(providers.vertex.configured).toBe(true);
+        expect(providers.vertex.successTotal).toEqual(expect.any(Number));
+        expect(providers.vertex.failureTotal).toEqual(expect.any(Number));
+        expect(providers.openai.enabled).toBe(false);
+        expect(providers.openai.configured).toBe(false);
+        expect(providers.openai.failureTotal).toEqual(expect.any(Number));
+
+        const { store } = await import('../src/store.js');
+        const previousGcpProject = store.get('gcpProject');
+        try {
+            store.update({ gcpProject: '' });
+            const missingProjectRes = await request(server, 'GET', '/api/stats', {
+                cookie: sessionCookie,
+            });
+            const missingProjectOperations = missingProjectRes.body!.operations as Record<
+                string,
+                unknown
+            >;
+            const missingProjectProviders = missingProjectOperations.providers as Record<
+                string,
+                Record<string, unknown>
+            >;
+            expect(missingProjectProviders.vertex.configured).toBe(false);
+        } finally {
+            store.update({ gcpProject: previousGcpProject });
+        }
+
+        const runtimePressure = operations.runtimePressure as Record<string, unknown>;
+        expect(runtimePressure.inflight).toEqual(expect.any(Number));
+        expect(runtimePressure.queued).toEqual(expect.any(Number));
+        expect(runtimePressure.rejectedTotal).toEqual(expect.any(Number));
+
+        const budgetRisk = operations.budgetRisk as Record<string, unknown>;
+        expect(budgetRisk.warningCount).toEqual(expect.any(Number));
+        expect(budgetRisk.exceededCount).toEqual(expect.any(Number));
+    });
+
     it('should expose readiness details on the authenticated health endpoint', async () => {
         healthCheck.mockResolvedValue({ healthy: true, latencyMs: 12 });
 
@@ -417,6 +477,118 @@ describe('Dashboard API', () => {
         });
         expect(res.status).toBe(200);
         expect(Array.isArray(res.body)).toBe(true);
+    });
+
+    it('should filter error logs by error type before applying count', async () => {
+        const rateLimitError = 'unique-rate-limit-before-count';
+        const authError = 'unique-auth-before-count';
+        log.addError({
+            guildId: 'guild-1',
+            userId: 'user-1',
+            error: rateLimitError,
+            command: 'translate',
+            errorType: 'rate_limit',
+        });
+        log.addError({
+            guildId: 'guild-1',
+            userId: 'user-1',
+            error: authError,
+            command: 'translate',
+            errorType: 'auth',
+        });
+        log.add({
+            guildId: 'guild-1',
+            userId: 'user-1',
+            userTag: 'User#0001',
+            contentPreview: 'hello',
+        });
+
+        const res = await request(
+            server,
+            'GET',
+            '/api/logs?count=1&filter=error&errorType=rate_limit',
+            {
+                cookie: sessionCookie,
+            },
+        );
+
+        expect(res.status).toBe(200);
+        const entries = res.body as Array<Record<string, unknown>>;
+        expect(entries.length).toBeGreaterThan(0);
+        expect(entries.every((entry) => entry.type === 'error')).toBe(true);
+        expect(entries.every((entry) => entry.errorType === 'rate_limit')).toBe(true);
+        expect(entries).toEqual(
+            expect.arrayContaining([
+                expect.objectContaining({
+                    error: rateLimitError,
+                    errorType: 'rate_limit',
+                }),
+            ]),
+        );
+        expect(entries).not.toEqual(
+            expect.arrayContaining([
+                expect.objectContaining({
+                    error: authError,
+                }),
+            ]),
+        );
+    });
+
+    it('should filter error logs by error type when filter is omitted', async () => {
+        const rateLimitError = 'unique-rate-limit-without-filter';
+        const authError = 'unique-auth-without-filter';
+        log.addError({
+            guildId: 'guild-1',
+            userId: 'user-1',
+            error: rateLimitError,
+            command: 'translate',
+            errorType: 'rate_limit',
+        });
+        log.addError({
+            guildId: 'guild-1',
+            userId: 'user-1',
+            error: authError,
+            command: 'translate',
+            errorType: 'auth',
+        });
+
+        const res = await request(server, 'GET', '/api/logs?errorType=rate_limit', {
+            cookie: sessionCookie,
+        });
+
+        expect(res.status).toBe(200);
+        const entries = res.body as Array<Record<string, unknown>>;
+        expect(entries.length).toBeGreaterThan(0);
+        expect(entries.every((entry) => entry.type === 'error')).toBe(true);
+        expect(entries.every((entry) => entry.errorType === 'rate_limit')).toBe(true);
+        expect(entries).toEqual(
+            expect.arrayContaining([
+                expect.objectContaining({
+                    error: rateLimitError,
+                }),
+            ]),
+        );
+        expect(entries).not.toEqual(
+            expect.arrayContaining([
+                expect.objectContaining({
+                    error: authError,
+                }),
+            ]),
+        );
+    });
+
+    it('should reject contradictory log type and error type filters', async () => {
+        const res = await request(
+            server,
+            'GET',
+            '/api/logs?filter=translation&errorType=rate_limit',
+            {
+                cookie: sessionCookie,
+            },
+        );
+
+        expect(res.status).toBe(400);
+        expect(res.body).toEqual({ error: 'errorType filter requires error logs' });
     });
 
     // --- Logout ---

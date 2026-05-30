@@ -271,6 +271,137 @@
   margin-top: 0.4rem;
 }
 
+/* --- Operations Panel --- */
+.operations-panel {
+  margin-bottom: 1.5rem;
+}
+
+.operations-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: flex-start;
+  margin-bottom: 1rem;
+}
+
+.operations-header h2 {
+  font-size: 1rem;
+  color: var(--text);
+}
+
+.operations-mode {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+.operations-mode-label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-dim);
+  font-weight: 600;
+}
+
+.operations-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.operations-card {
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.9rem;
+  transition: border-color 0.2s;
+}
+
+.operations-card:hover {
+  border-color: var(--border-hover);
+}
+
+.operations-card-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  align-items: center;
+  margin-bottom: 0.75rem;
+}
+
+.operations-card h3 {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+.operations-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.4rem;
+  max-width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.15rem 0.5rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+
+.operations-pill.ok {
+  border-color: var(--green);
+  color: var(--green);
+}
+
+.operations-pill.warn {
+  border-color: var(--yellow);
+  color: var(--yellow);
+}
+
+.operations-pill.danger {
+  border-color: var(--red);
+  color: var(--red);
+}
+
+.operations-pill.muted {
+  color: var(--text-dim);
+}
+
+.operations-metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.55rem 0.75rem;
+}
+
+.operations-metric {
+  min-width: 0;
+}
+
+.operations-metric-label {
+  display: block;
+  margin-bottom: 0.15rem;
+  font-size: 0.68rem;
+  color: var(--text-dim);
+}
+
+.operations-metric strong {
+  display: block;
+  font-size: 1rem;
+  color: #fff;
+}
+
+.operations-card-sub {
+  margin-top: 0.75rem;
+  padding-top: 0.7rem;
+  border-top: 1px solid var(--border);
+  font-size: 0.75rem;
+  line-height: 1.4;
+  color: var(--text-dim);
+}
+
 /* --- Per-Server Budget Overview Items --- */
 .guild-budget-overview-item {
   display: flex;
@@ -422,4 +553,51 @@
   background: var(--accent);
   border-color: var(--accent);
   color: #fff;
+}
+
+.log-row-error td {
+  background: rgba(240, 71, 71, 0.04);
+}
+
+.log-detail-cell,
+.log-error-text {
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.log-error-text {
+  color: var(--text);
+}
+
+.log-suggestion {
+  margin-top: 0.2rem;
+  max-width: 260px;
+  color: var(--text-dim);
+  font-size: 0.72rem;
+  line-height: 1.35;
+}
+
+.log-diagnostics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  align-items: center;
+  min-width: 150px;
+}
+
+.log-diagnostic-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.4rem;
+  max-width: 100%;
+  padding: 0.1rem 0.4rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-dim);
+  font-size: 0.68rem;
+  font-weight: 600;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
 }

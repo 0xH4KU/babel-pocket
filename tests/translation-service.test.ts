@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { AppMetrics } from '../src/app-metrics.js';
 import { TranslationCache } from '../src/cache.js';
 import { CooldownManager } from '../src/cooldown.js';
+import { ProviderOrchestratorError } from '../src/infra/provider-orchestrator.js';
 import { TranslationLog } from '../src/log.js';
 import { createTranslationService, _test } from '../src/services/translation-service.js';
 import { TranslationRuntimeLimiter } from '../src/translation-runtime-limiter.js';
@@ -177,14 +178,24 @@ describe('TranslationService', () => {
         expect(result.status === 'success' ? result.targetLanguage : '').toBe('ja');
         expect(result.status === 'success' ? result.langSource : '').toBe('setlang');
         expect(beforeTranslate).toHaveBeenCalledTimes(1);
-        expect(translator).toHaveBeenCalledWith('Hello world', 'ja', {
-            logContext: {
-                requestId: 'req-1',
-                guildId: 'guild-1',
-                userId: 'user1',
-                command: 'babel',
-            },
-        });
+        expect(translator).toHaveBeenCalledWith(
+            'Hello world',
+            'ja',
+            expect.objectContaining({
+                logContext: {
+                    requestId: 'req-1',
+                    guildId: 'guild-1',
+                    userId: 'user1',
+                    command: 'babel',
+                },
+            }),
+        );
+        const translatorOptions = translator.mock.calls[0]?.[2];
+        expect(Object.keys(translatorOptions ?? {})).toEqual(
+            expect.arrayContaining(['logContext', 'metrics']),
+        );
+        expect(Object.prototype.propertyIsEnumerable.call(translatorOptions, 'metrics')).toBe(true);
+        expect(translatorOptions?.metrics).toBe(metrics);
         expect(usageTracker.record).toHaveBeenCalledWith(12, 6, 'guild-1');
         expect(log.size).toBe(1);
         expect(stats.totalTranslations).toBe(1);
@@ -312,10 +323,10 @@ describe('TranslationService', () => {
         expect(metrics.snapshot().budgetExceededTotal).toBe(1);
     });
 
-    it('should return a sanitized error result when translation fails', async () => {
+    it('should return a sanitized error result and diagnostic log when translation fails', async () => {
         const translator = vi.fn(async () => {
             throw new Error(
-                'Vertex AI 500: https://example.com/projects/test-project/secret-token-value',
+                'Vertex AI 429 rate limit: https://example.com/projects/test-project/secret-token-value',
             );
         });
         const { service, log, metrics } = createService({ translator });
@@ -329,6 +340,7 @@ describe('TranslationService', () => {
             userTag: 'user#0001',
             locale: 'en-US',
             text: 'Hello world',
+            requestId: 'req-failure-1',
             beforeTranslate: async () => undefined,
         });
 
@@ -338,10 +350,57 @@ describe('TranslationService', () => {
             'https://example.com',
         );
         expect(log.errorCount).toBe(1);
+        const errorEntry = log.getRecent(1)[0];
+        expect(errorEntry).toMatchObject({
+            type: 'error',
+            requestId: 'req-failure-1',
+            errorType: 'rate_limit',
+            suggestedAction:
+                'Provider rate limit reached. Try fallback mode or reduce concurrency.',
+        });
+        expect(errorEntry.type === 'error' ? errorEntry.error : '').not.toContain(
+            'https://example.com',
+        );
+        expect(errorEntry.type === 'error' ? errorEntry.error : '').not.toContain(
+            'secret-token-value',
+        );
         expect(metrics.snapshot()).toMatchObject({
             translationApiCallsTotal: 1,
             translationFailuresTotal: 1,
             translationFailureRate: 1,
+        });
+    });
+
+    it('should record provider diagnostics from orchestrator failures', async () => {
+        const translator = vi.fn(async () => {
+            throw new ProviderOrchestratorError('OpenAI 500 server error', {
+                provider: 'openai',
+                errorType: 'server_error',
+            });
+        });
+        const { service, log } = createService({ translator });
+
+        const result = await service.process({
+            command: 'translate',
+            commandLabel: '/translate',
+            guildId: 'guild-1',
+            guildName: 'Test Guild',
+            userId: 'user1',
+            userTag: 'user#0001',
+            locale: 'en-US',
+            text: 'Hello world',
+            requestId: 'req-provider-failure-1',
+            beforeTranslate: async () => undefined,
+        });
+
+        const errorEntry = log.getRecent(1)[0];
+
+        expect(result.status).toBe('error');
+        expect(errorEntry).toMatchObject({
+            type: 'error',
+            requestId: 'req-provider-failure-1',
+            provider: 'openai',
+            errorType: 'server_error',
         });
     });
 

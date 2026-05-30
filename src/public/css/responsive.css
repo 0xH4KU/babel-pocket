@@ -29,6 +29,10 @@
         gap: 0.75rem;
     }
 
+    .operations-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
     .settings-row {
         flex-direction: column;
         gap: 0.75rem;
@@ -77,6 +81,14 @@
 
 @media (max-width: 480px) {
     .grid {
+        grid-template-columns: 1fr;
+    }
+
+    .operations-header {
+        flex-direction: column;
+    }
+
+    .operations-grid {
         grid-template-columns: 1fr;
     }
 

@@ -1,5 +1,6 @@
 import { buildTranslationCacheKey, type TranslationCache } from './cache.js';
 import type { CooldownManager } from './cooldown.js';
+import { ProviderOrchestratorError } from '../../infra/provider-orchestrator.js';
 import type { TranslationLog } from '../../shared/log.js';
 import { isSameLanguage, localeToLang } from './lang.js';
 import type { AppMetricsCollector } from '../../shared/app-metrics.js';
@@ -12,7 +13,7 @@ import type {
 } from './translation-runtime-limiter.js';
 import { usage } from '../usage/usage.js';
 import { translate, resolveSystemPrompt } from './translate.js';
-import { sanitizeError } from '../../commands/shared.js';
+import { sanitizeError } from '../../shared/errors.js';
 import {
     appLogger,
     createRequestId,
@@ -26,6 +27,15 @@ import type { BotStats, TranslationResult } from '../../types.js';
 
 type ServiceCommand = 'babel' | 'translate';
 type LangSource = 'option' | 'setlang' | 'locale' | 'auto';
+type TranslatorOptions = {
+    metrics?: AppMetricsCollector;
+    logContext: {
+        requestId: string;
+        guildId?: string | null;
+        userId: string;
+        command: ServiceCommand;
+    };
+};
 
 interface ConfigRepositoryLike {
     getRuntimeConfig(): RuntimeConfig;
@@ -45,14 +55,7 @@ interface Translator {
     (
         text: string,
         targetLanguage?: string,
-        options?: {
-            logContext?: {
-                requestId: string;
-                guildId?: string | null;
-                userId: string;
-                command: ServiceCommand;
-            };
-        },
+        options?: TranslatorOptions,
     ): Promise<TranslationResult>;
 }
 
@@ -121,6 +124,72 @@ function resolveQueueBusyMessage(reason: RuntimeLimitReason, messages: QueueBusy
         case 'global_queue_full':
             return messages.serviceBusy;
     }
+}
+
+function createTranslatorOptions(
+    logContext: TranslatorOptions['logContext'],
+    metrics?: AppMetricsCollector,
+): TranslatorOptions {
+    if (metrics) {
+        return { logContext, metrics };
+    }
+
+    return { logContext };
+}
+
+function suggestedActionForErrorType(errorType: string): string {
+    switch (errorType) {
+        case 'rate_limit':
+            return 'Provider rate limit reached. Try fallback mode or reduce concurrency.';
+        case 'auth':
+            return 'Check provider API key and provider configuration.';
+        case 'timeout':
+            return 'Provider timed out. Check provider status or use fallback mode.';
+        case 'budget':
+            return 'Review global or server budget limits.';
+        case 'server_error':
+            return 'Provider returned a server error. Check provider status or use fallback mode.';
+        default:
+            return 'Check structured logs for this request id.';
+    }
+}
+
+function classifyTranslationError(message: string): { errorType: string; suggestedAction: string } {
+    if (/429|rate/i.test(message)) {
+        return {
+            errorType: 'rate_limit',
+            suggestedAction: suggestedActionForErrorType('rate_limit'),
+        };
+    }
+    if (/401|403|auth|api key|not configured/i.test(message)) {
+        return {
+            errorType: 'auth',
+            suggestedAction: suggestedActionForErrorType('auth'),
+        };
+    }
+    if (/timeout|aborted/i.test(message)) {
+        return {
+            errorType: 'timeout',
+            suggestedAction: suggestedActionForErrorType('timeout'),
+        };
+    }
+    if (/budget/i.test(message)) {
+        return {
+            errorType: 'budget',
+            suggestedAction: suggestedActionForErrorType('budget'),
+        };
+    }
+    if (/5\d\d|server/i.test(message)) {
+        return {
+            errorType: 'server_error',
+            suggestedAction: suggestedActionForErrorType('server_error'),
+        };
+    }
+
+    return {
+        errorType: 'unknown',
+        suggestedAction: suggestedActionForErrorType('unknown'),
+    };
 }
 
 export function createTranslationService({
@@ -302,14 +371,19 @@ export function createTranslationService({
 
                             stats.apiCalls++;
                             metrics?.recordTranslationApiCall();
-                            const result = await translator(originalText, targetLanguage, {
-                                logContext: {
-                                    requestId,
-                                    guildId: request.guildId ?? null,
-                                    userId: request.userId,
-                                    command: request.command,
-                                },
-                            });
+                            const result = await translator(
+                                originalText,
+                                targetLanguage,
+                                createTranslatorOptions(
+                                    {
+                                        requestId,
+                                        guildId: request.guildId ?? null,
+                                        userId: request.userId,
+                                        command: request.command,
+                                    },
+                                    metrics,
+                                ),
+                            );
                             cache.set(cacheKey, result.text);
                             usageTracker.record(
                                 result.inputTokens,
@@ -321,14 +395,19 @@ export function createTranslationService({
                     } else {
                         stats.apiCalls++;
                         metrics?.recordTranslationApiCall();
-                        const result = await translator(originalText, targetLanguage, {
-                            logContext: {
-                                requestId,
-                                guildId: request.guildId ?? null,
-                                userId: request.userId,
-                                command: request.command,
-                            },
-                        });
+                        const result = await translator(
+                            originalText,
+                            targetLanguage,
+                            createTranslatorOptions(
+                                {
+                                    requestId,
+                                    guildId: request.guildId ?? null,
+                                    userId: request.userId,
+                                    command: request.command,
+                                },
+                                metrics,
+                            ),
+                        );
                         translated = result.text;
                         cache.set(cacheKey, translated);
                         usageTracker.record(
@@ -368,24 +447,41 @@ export function createTranslationService({
                 };
             } catch (error) {
                 reservation?.cancel();
-                const message = (error as Error).message;
+                const caughtError = error instanceof Error ? error : new Error(String(error));
+                const message = caughtError.message;
+                const sanitizedMessage = sanitizeError(message);
+                const diagnostic =
+                    caughtError instanceof ProviderOrchestratorError
+                        ? {
+                              errorType: caughtError.errorType,
+                              suggestedAction: suggestedActionForErrorType(caughtError.errorType),
+                          }
+                        : classifyTranslationError(message);
                 metrics?.recordTranslationFailure();
                 log.addError({
                     guildId: request.guildId,
                     guildName: request.guildName,
                     userId: request.userId,
                     userTag: request.userTag,
-                    error: message,
+                    error: sanitizedMessage,
                     command: request.commandLabel,
+                    requestId,
+                    provider:
+                        caughtError instanceof ProviderOrchestratorError
+                            ? caughtError.provider
+                            : undefined,
+                    errorType: diagnostic.errorType,
+                    suggestedAction: diagnostic.suggestedAction,
                 });
                 requestLogger.error('translation.request.failed', {
-                    error: message,
+                    error: sanitizedMessage,
+                    errorType: diagnostic.errorType,
                 });
 
                 return {
                     status: 'error',
                     deferred,
-                    message: discordMessages.translationFailed(sanitizeError(message)),
+                    message: discordMessages.translationFailed(sanitizedMessage),
                 };
             }
         },
@@ -426,4 +522,8 @@ function resolveTargetLanguage(
     };
 }
 
-export const _test = { resolveTargetLanguage, resolveQueueBusyMessage };
+export const _test = {
+    resolveTargetLanguage,
+    resolveQueueBusyMessage,
+    classifyTranslationError,
+};

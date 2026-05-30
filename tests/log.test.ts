@@ -22,8 +22,20 @@ describe('TranslationLog', () => {
 
     it('should return entries in newest-first order', () => {
         const log = new TranslationLog(10);
-        log.add({ guildId: 'g1', userId: 'u1', userTag: 'u1', contentPreview: 'First', cached: false });
-        log.add({ guildId: 'g1', userId: 'u1', userTag: 'u1', contentPreview: 'Second', cached: false });
+        log.add({
+            guildId: 'g1',
+            userId: 'u1',
+            userTag: 'u1',
+            contentPreview: 'First',
+            cached: false,
+        });
+        log.add({
+            guildId: 'g1',
+            userId: 'u1',
+            userTag: 'u1',
+            contentPreview: 'Second',
+            cached: false,
+        });
 
         const entries = log.getRecent(10);
         expect((entries[0] as TranslationLogEntry).contentPreview).toBe('Second');
@@ -41,13 +53,21 @@ describe('TranslationLog', () => {
         const entries = log.getRecent(10);
         expect((entries[0] as TranslationLogEntry).contentPreview).toBe('D');
         // 'A' should have been evicted
-        expect(entries.find((e) => (e as TranslationLogEntry).contentPreview === 'A')).toBeUndefined();
+        expect(
+            entries.find((e) => (e as TranslationLogEntry).contentPreview === 'A'),
+        ).toBeUndefined();
     });
 
     it('should truncate content preview to 50 chars', () => {
         const log = new TranslationLog(10);
         const longText = 'A'.repeat(100);
-        log.add({ guildId: 'g1', userId: 'u1', userTag: 'u1', contentPreview: longText, cached: false });
+        log.add({
+            guildId: 'g1',
+            userId: 'u1',
+            userTag: 'u1',
+            contentPreview: longText,
+            cached: false,
+        });
 
         const entries = log.getRecent(1);
         expect((entries[0] as TranslationLogEntry).contentPreview.length).toBe(50);
@@ -56,7 +76,13 @@ describe('TranslationLog', () => {
     it('should limit getRecent count', () => {
         const log = new TranslationLog(100);
         for (let i = 0; i < 10; i++) {
-            log.add({ guildId: 'g1', userId: 'u1', userTag: 'u1', contentPreview: `Msg ${i}`, cached: false });
+            log.add({
+                guildId: 'g1',
+                userId: 'u1',
+                userTag: 'u1',
+                contentPreview: `Msg ${i}`,
+                cached: false,
+            });
         }
 
         expect(log.getRecent(3)).toHaveLength(3);
@@ -64,7 +90,13 @@ describe('TranslationLog', () => {
 
     it('should auto-set timestamp', () => {
         const log = new TranslationLog(10);
-        log.add({ guildId: 'g1', userId: 'u1', userTag: 'u1', contentPreview: 'Test', cached: false });
+        log.add({
+            guildId: 'g1',
+            userId: 'u1',
+            userTag: 'u1',
+            contentPreview: 'Test',
+            cached: false,
+        });
 
         const entries = log.getRecent(1);
         expect(entries[0].timestamp).toBeGreaterThan(0);
@@ -88,6 +120,31 @@ describe('TranslationLog', () => {
         expect((entries[0] as ErrorLogEntry).command).toBe('Babel');
     });
 
+    it('should retain optional diagnostic fields on error logs', () => {
+        const log = new TranslationLog();
+
+        log.addError({
+            guildId: 'guild-1',
+            guildName: 'Guild One',
+            userId: 'user-1',
+            userTag: 'User#0001',
+            error: 'OpenAI 429',
+            command: 'translate',
+            requestId: 'req_123',
+            provider: 'openai',
+            errorType: 'rate_limit',
+            suggestedAction: 'Provider is rate limited. Try fallback mode or lower traffic.',
+        });
+
+        expect(log.getRecent(1)[0]).toMatchObject({
+            type: 'error',
+            requestId: 'req_123',
+            provider: 'openai',
+            errorType: 'rate_limit',
+            suggestedAction: 'Provider is rate limited. Try fallback mode or lower traffic.',
+        });
+    });
+
     it('should truncate error message to 200 chars', () => {
         const log = new TranslationLog(10);
         const longError = 'E'.repeat(500);
@@ -99,29 +156,53 @@ describe('TranslationLog', () => {
 
     it('should filter by type "translation"', () => {
         const log = new TranslationLog(10);
-        log.add({ guildId: 'g1', userId: 'u1', userTag: 'u1', contentPreview: 'Hello', cached: false });
+        log.add({
+            guildId: 'g1',
+            userId: 'u1',
+            userTag: 'u1',
+            contentPreview: 'Hello',
+            cached: false,
+        });
         log.addError({ guildId: 'g1', userId: 'u1', error: 'fail', command: 'test' });
-        log.add({ guildId: 'g1', userId: 'u1', userTag: 'u1', contentPreview: 'World', cached: true });
+        log.add({
+            guildId: 'g1',
+            userId: 'u1',
+            userTag: 'u1',
+            contentPreview: 'World',
+            cached: true,
+        });
 
         const translations = log.getRecent(10, 'translation');
         expect(translations).toHaveLength(2);
-        expect(translations.every(e => e.type === 'translation')).toBe(true);
+        expect(translations.every((e) => e.type === 'translation')).toBe(true);
     });
 
     it('should filter by type "error"', () => {
         const log = new TranslationLog(10);
-        log.add({ guildId: 'g1', userId: 'u1', userTag: 'u1', contentPreview: 'Hello', cached: false });
+        log.add({
+            guildId: 'g1',
+            userId: 'u1',
+            userTag: 'u1',
+            contentPreview: 'Hello',
+            cached: false,
+        });
         log.addError({ guildId: 'g1', userId: 'u1', error: 'fail1', command: 'test' });
         log.addError({ guildId: 'g1', userId: 'u1', error: 'fail2', command: 'test' });
 
         const errors = log.getRecent(10, 'error');
         expect(errors).toHaveLength(2);
-        expect(errors.every(e => e.type === 'error')).toBe(true);
+        expect(errors.every((e) => e.type === 'error')).toBe(true);
     });
 
     it('should count errors via errorCount getter', () => {
         const log = new TranslationLog(10);
-        log.add({ guildId: 'g1', userId: 'u1', userTag: 'u1', contentPreview: 'Hello', cached: false });
+        log.add({
+            guildId: 'g1',
+            userId: 'u1',
+            userTag: 'u1',
+            contentPreview: 'Hello',
+            cached: false,
+        });
         log.addError({ guildId: 'g1', userId: 'u1', error: 'fail1', command: 'test' });
         log.addError({ guildId: 'g1', userId: 'u1', error: 'fail2', command: 'test' });
 
@@ -134,7 +215,7 @@ describe('TranslationLog', () => {
 
         const entry = log.getRecent(1)[0] as TranslationLogEntry;
         expect(entry.guildName).toBe('g1'); // defaults to guildId
-        expect(entry.userTag).toBe('u1');   // defaults to userId
+        expect(entry.userTag).toBe('u1'); // defaults to userId
         expect(entry.contentPreview).toBe('');
         expect(entry.targetLanguage).toBe('auto');
         expect(entry.langSource).toBe('auto');
@@ -160,6 +241,6 @@ describe('TranslationLog', () => {
         expect(log.size).toBe(3);
         // 'A' should have been evicted
         const all = log.getRecent(10);
-        expect(all.find(e => (e as TranslationLogEntry).contentPreview === 'A')).toBeUndefined();
+        expect(all.find((e) => (e as TranslationLogEntry).contentPreview === 'A')).toBeUndefined();
     });
 });
