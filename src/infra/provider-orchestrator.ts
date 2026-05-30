@@ -31,6 +31,25 @@ export interface ProviderOrchestratorOptions {
     metrics?: AppMetricsCollector;
 }
 
+export class ProviderOrchestratorError extends Error {
+    readonly provider: string;
+    readonly errorType: string;
+
+    constructor(
+        message: string,
+        options: {
+            provider: string;
+            errorType: string;
+            cause?: Error;
+        },
+    ) {
+        super(message, { cause: options.cause });
+        this.name = 'ProviderOrchestratorError';
+        this.provider = options.provider;
+        this.errorType = options.errorType;
+    }
+}
+
 function resolveProviderOrder(
     mode: TranslationProviderMode,
     providers: Map<string, TranslationProvider>,
@@ -63,6 +82,10 @@ export function classifyProviderError(error: Error | null): string {
     return 'unknown';
 }
 
+function toError(error: unknown): Error {
+    return error instanceof Error ? error : new Error(String(error));
+}
+
 export function createProviderOrchestrator(
     mode: TranslationProviderMode,
     providers: Map<string, TranslationProvider>,
@@ -86,6 +109,7 @@ export function createProviderOrchestrator(
             }
 
             let lastError: Error | null = null;
+            let lastProvider: string | null = null;
 
             for (let i = 0; i < configured.length; i++) {
                 const provider = configured[i]!;
@@ -115,7 +139,8 @@ export function createProviderOrchestrator(
                         fallback: isFallback,
                     };
                 } catch (error) {
-                    lastError = error as Error;
+                    lastError = toError(error);
+                    lastProvider = provider.name;
                     orchestratorOptions.metrics?.recordProviderFailure(provider.name, {
                         errorType: classifyProviderError(lastError),
                         error: lastError.message,
@@ -129,8 +154,12 @@ export function createProviderOrchestrator(
                 }
             }
 
-            // All providers failed — throw the last error
-            throw lastError!;
+            // All providers failed — preserve the last provider diagnostic for callers.
+            throw new ProviderOrchestratorError(lastError?.message ?? 'Unknown provider failure', {
+                provider: lastProvider ?? 'unknown',
+                errorType: classifyProviderError(lastError),
+                cause: lastError ?? undefined,
+            });
         },
     };
 }

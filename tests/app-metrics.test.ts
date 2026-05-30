@@ -110,4 +110,36 @@ describe('AppMetrics', () => {
             error: 'Vertex AI 429',
         });
     });
+
+    it('should sanitize provider errors before exposing metric snapshots', () => {
+        const metrics = new AppMetrics();
+        const rawError =
+            'Vertex AI 429 at https://vertex.googleapis.com/v1/projects/project-123/locations/global with token abcdefghijklmnopqrstuvwxyz1234567890';
+
+        metrics.recordProviderFailure('vertex', {
+            errorType: 'rate_limit',
+            error: rawError,
+        });
+        metrics.recordProviderFallback({
+            from: 'vertex',
+            to: 'openai',
+            errorType: 'rate_limit',
+            error: rawError,
+        });
+
+        const snapshot = metrics.snapshot();
+
+        expect(snapshot.providers.vertex?.lastError).toContain('[API endpoint]');
+        expect(snapshot.providers.vertex?.lastError).toContain('***');
+        expect(snapshot.providers.vertex?.lastError).not.toContain('vertex.googleapis.com');
+        expect(snapshot.providers.vertex?.lastError).not.toContain(
+            'abcdefghijklmnopqrstuvwxyz1234567890',
+        );
+        expect(snapshot.lastProviderFallback?.error).toContain('[API endpoint]');
+        expect(snapshot.lastProviderFallback?.error).toContain('***');
+        expect(snapshot.lastProviderFallback?.error).not.toContain('vertex.googleapis.com');
+        expect(snapshot.lastProviderFallback?.error).not.toContain(
+            'abcdefghijklmnopqrstuvwxyz1234567890',
+        );
+    });
 });

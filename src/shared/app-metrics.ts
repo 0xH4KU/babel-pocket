@@ -1,3 +1,5 @@
+import { sanitizeError } from './errors.js';
+
 export interface ProviderMetricsSnapshot {
     successTotal: number;
     failureTotal: number;
@@ -119,7 +121,7 @@ export class AppMetrics implements AppMetricsCollector {
 
         providerMetrics.failureTotal += 1;
         providerMetrics.lastErrorType = options.errorType;
-        providerMetrics.lastError = options.error;
+        providerMetrics.lastError = sanitizeError(options.error);
     }
 
     recordProviderFallback(options: {
@@ -138,7 +140,7 @@ export class AppMetrics implements AppMetricsCollector {
             from: options.from,
             to: options.to,
             errorType: options.errorType,
-            error: options.error,
+            error: sanitizeError(options.error),
             timestamp: Date.now(),
         };
     }

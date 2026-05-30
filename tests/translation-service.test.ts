@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { AppMetrics } from '../src/app-metrics.js';
 import { TranslationCache } from '../src/cache.js';
 import { CooldownManager } from '../src/cooldown.js';
+import { ProviderOrchestratorError } from '../src/infra/provider-orchestrator.js';
 import { TranslationLog } from '../src/log.js';
 import { createTranslationService, _test } from '../src/services/translation-service.js';
 import { TranslationRuntimeLimiter } from '../src/translation-runtime-limiter.js';
@@ -367,6 +368,39 @@ describe('TranslationService', () => {
             translationApiCallsTotal: 1,
             translationFailuresTotal: 1,
             translationFailureRate: 1,
+        });
+    });
+
+    it('should record provider diagnostics from orchestrator failures', async () => {
+        const translator = vi.fn(async () => {
+            throw new ProviderOrchestratorError('OpenAI 500 server error', {
+                provider: 'openai',
+                errorType: 'server_error',
+            });
+        });
+        const { service, log } = createService({ translator });
+
+        const result = await service.process({
+            command: 'translate',
+            commandLabel: '/translate',
+            guildId: 'guild-1',
+            guildName: 'Test Guild',
+            userId: 'user1',
+            userTag: 'user#0001',
+            locale: 'en-US',
+            text: 'Hello world',
+            requestId: 'req-provider-failure-1',
+            beforeTranslate: async () => undefined,
+        });
+
+        const errorEntry = log.getRecent(1)[0];
+
+        expect(result.status).toBe('error');
+        expect(errorEntry).toMatchObject({
+            type: 'error',
+            requestId: 'req-provider-failure-1',
+            provider: 'openai',
+            errorType: 'server_error',
         });
     });
 

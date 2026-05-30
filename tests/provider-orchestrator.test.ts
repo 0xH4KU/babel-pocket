@@ -69,4 +69,29 @@ describe('ProviderOrchestrator diagnostics', () => {
         expect(metrics.snapshot().providers.openai.failureTotal).toBe(1);
         expect(metrics.snapshot().providerFallbackTotal).toBe(1);
     });
+
+    it('throws the last provider diagnostic when all providers fail', async () => {
+        const orchestrator = createProviderOrchestrator(
+            'vertex+openai',
+            new Map([
+                ['vertex', provider('vertex', 'fail')],
+                ['openai', provider('openai', 'fail')],
+            ]),
+        );
+
+        let thrown: unknown;
+        try {
+            await orchestrator.translate('prompt', 100);
+        } catch (error) {
+            thrown = error;
+        }
+
+        expect(thrown).toBeInstanceOf(Error);
+        expect(thrown).toMatchObject({
+            name: 'ProviderOrchestratorError',
+            message: 'openai failed',
+            provider: 'openai',
+            errorType: 'unknown',
+        });
+    });
 });
