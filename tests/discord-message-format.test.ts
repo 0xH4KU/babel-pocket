@@ -5,7 +5,7 @@ import {
 } from '../src/shared/discord-message-format.js';
 
 describe('discord message formatting', () => {
-    it('should split long translation output into Discord-safe chunks with metadata', () => {
+    it('should split long translation output into Discord-safe chunks without diagnostics by default', () => {
         const translatedText = 'a'.repeat(DISCORD_MESSAGE_LIMIT * 2 + 120);
 
         const messages = buildTranslationMessages({
@@ -20,14 +20,27 @@ describe('discord message formatting', () => {
 
         expect(messages.length).toBeGreaterThan(1);
         expect(messages.every((message) => message.length <= DISCORD_MESSAGE_LIMIT)).toBe(true);
-        expect(messages[0]).toContain('Target: `ja`');
-        expect(messages[0]).toContain('Cache: `hit`');
-        expect(messages[0]).toContain('Provider: `vertex`');
-        expect(messages[0]).toContain('Tokens: `12 in / 34 out`');
-        expect(messages.join('')).toContain(translatedText);
+        expect(messages.join('')).toBe(translatedText);
     });
 
-    it('should keep a short quoted preview of the original text in the first chunk only', () => {
+    it('should include the original preview without diagnostics when requested', () => {
+        const messages = buildTranslationMessages({
+            originalText: 'line one\nline two',
+            translatedText: 'こんにちは',
+            targetLanguage: 'ja',
+            cached: false,
+            includeOriginalPreview: true,
+        });
+
+        expect(messages).toHaveLength(1);
+        expect(messages[0]).toBe('> line one\n> line two\n\nこんにちは');
+        expect(messages[0]).not.toContain('Target:');
+        expect(messages[0]).not.toContain('Cache:');
+        expect(messages[0]).not.toContain('Provider:');
+        expect(messages[0]).not.toContain('Tokens:');
+    });
+
+    it('should return only the translated text for short output', () => {
         const messages = buildTranslationMessages({
             originalText: 'line one\nline two',
             translatedText: 'こんにちは',
@@ -36,7 +49,6 @@ describe('discord message formatting', () => {
         });
 
         expect(messages).toHaveLength(1);
-        expect(messages[0]).toContain('> line one\n> line two');
-        expect(messages[0]).toContain('Cache: `miss`');
+        expect(messages[0]).toBe('こんにちは');
     });
 });
