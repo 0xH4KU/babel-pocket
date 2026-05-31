@@ -24,7 +24,7 @@ import { userPreferenceRepository } from '../translation/user-preference-reposit
 import { applyConfigUpdateEffects } from '../config/config-runtime-effects.js';
 import { appLogger } from '../../shared/structured-logger.js';
 import { dashboardMessages } from '../../shared/messages/dashboard-messages.js';
-import { getVersionMetadata } from '../../shared/version.js';
+import { getVersionMetadata, getVersionMetadataWithUpdate } from '../../shared/version.js';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import type { DashboardDeps, StoreData, TranslationProviderMode } from '../../types.js';
@@ -536,6 +536,7 @@ export function createDashboardApp({
     runtimeLimiter,
     healthCheck = checkVertexAiHealth,
     openAiHealthCheck = checkOpenAiHealth,
+    versionCheck = getVersionMetadataWithUpdate,
     sessionRepository,
     healthProbeCacheTtlMs = 5_000,
 }: DashboardDeps): express.Express {
@@ -629,9 +630,13 @@ export function createDashboardApp({
         res.json({ complete: configRepository.isSetupComplete() });
     });
 
-    app.get('/api/version', auth.requireAuth, (_req: Request, res: Response) => {
-        res.json(getVersionMetadata());
-    });
+    app.get(
+        '/api/version',
+        auth.requireAuth,
+        asyncHandler(async (_req: Request, res: Response) => {
+            res.json(await versionCheck());
+        }),
+    );
 
     app.get('/api/sessions', auth.requireAuth, (req: Request, res: Response) => {
         res.json({ sessions: auth.listSessions(req) });

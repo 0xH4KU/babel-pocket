@@ -1,6 +1,6 @@
 {
   "name": "babel-discord-translator",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Discord right-click translation bot powered by Vertex AI Gemini — with LRU cache, cost tracking, multilingual support, and web dashboard",
   "type": "module",
   "main": "dist/src/index.js",
@@ -12,6 +12,7 @@
     "register": "tsx scripts/register.ts",
     "db:migrate": "tsx scripts/migrate-json-to-sqlite.ts",
     "db:export:json": "tsx scripts/export-sqlite-to-json.ts",
+    "demo:build": "tsx scripts/build-demo.ts",
     "benchmark:runtime-config": "tsx scripts/benchmark-runtime-config.ts",
     "test": "vitest run",
     "test:watch": "vitest",

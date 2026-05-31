@@ -4,20 +4,40 @@
 
 # Babel
 
-**Discord translation bot with one-click context menu, powered by Vertex AI Gemini.**
+**Self-hosted Discord translation bot with one-click private translations, a web dashboard, usage budgets, and bring-your-own AI provider.**
 
-Right-click any message → *Babel* → Get an ephemeral translation only you can see.
+Right-click any message → *Babel* → get an ephemeral translation only you can see.
+Server owners keep control of hosting, API keys, access rules, and token costs instead of paying a monthly hosted-bot subscription.
 
 [![License: GPL-3.0-only](https://img.shields.io/badge/License-GPL--3.0--only-blue.svg)](LICENSE)
 [![Node.js](https://img.shields.io/badge/Node.js-22.5%2B-green.svg)](https://nodejs.org)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue.svg)](https://www.typescriptlang.org/)
 [![discord.js](https://img.shields.io/badge/discord.js-v14-blue.svg)](https://discord.js.org)
-[![Version](https://img.shields.io/badge/version-0.1.0-brightgreen.svg)](package.json)
+[![Version](https://img.shields.io/badge/version-0.1.1-brightgreen.svg)](package.json)
 [![CI](https://github.com/0xH4KU/babel-discord-translator/actions/workflows/ci.yml/badge.svg)](https://github.com/0xH4KU/babel-discord-translator/actions)
+
+[Live Dashboard Demo](https://0xh4ku.github.io/babel-discord-translator/demo/) ·
+[Deployment Guide](docs/operations/deployment.md) ·
+[Support on Ko-fi](https://ko-fi.com/0xh4ku)
 
 </div>
 
 ---
+
+## Why Babel
+
+Babel is for Discord communities that want translation without handing control to a paid shared bot. You deploy your own instance, use your own AI provider key, and manage cost from the dashboard.
+
+- **Self-hosted** — your Discord token, provider keys, SQLite data, and logs stay in your deployment
+- **No privileged intents** — Babel uses context menu and slash commands, not full message-content access
+- **Cost controls** — daily budgets, per-server budget overrides, cache hit tracking, and usage history
+- **Operations ready** — health endpoints, Prometheus metrics, runtime queue limits, provider fallback diagnostics, and backup docs
+
+Try the [read-only dashboard demo](https://0xh4ku.github.io/babel-discord-translator/demo/) with mock data before deploying.
+
+## Support
+
+Babel is free and self-hosted. If it saves you setup time or helps your community avoid a hosted bot subscription, you can support upstream maintenance on [Ko-fi](https://ko-fi.com/0xh4ku).
 
 ## Features
 
@@ -110,6 +130,8 @@ npm start
 
 Open `http://localhost:3000` → Login → Complete the setup wizard.
 On first boot, Babel creates `data/babel.sqlite` and auto-imports `data/config.json` if a legacy JSON store exists.
+
+For Railway, Docker, VPS, PM2, and static dashboard demo notes, see the [deployment guide](docs/operations/deployment.md).
 
 ---
 
@@ -315,6 +337,7 @@ npm run test:watch      # Run tests in watch mode
 npm run lint            # Run ESLint
 npm run format          # Format with Prettier
 npm run build           # Build for production
+npm run demo:build      # Mirror dashboard assets into docs/demo for GitHub Pages
 npm start               # Run the production artifact
 npm run db:migrate      # Import legacy JSON → SQLite
 npm run db:export:json  # Export SQLite → JSON
@@ -329,7 +352,7 @@ Hooks are installed automatically on normal local Git checkouts. The `prepare` s
 
 ### Test Coverage
 
-219 tests across 26 suites covering all modules:
+223 tests across 28 suites covering all modules:
 
 | Suite | Tests | Covers |
 |---|---|---|
@@ -343,6 +366,7 @@ Hooks are installed automatically on normal local Git checkouts. The `prepare` s
 | `lang.test.ts` | 29 | Script detection (CJK/Cyrillic/Arabic/Thai/Hindi), locale mapping, same-language check |
 | `dashboard-auth.test.ts` | 4 | scrypt auth flow, CSRF enforcement, session expiry cleanup |
 | `prepare-husky.test.ts` | 5 | Husky prepare skip logic for CI, missing git metadata, Windows/local execution |
+| `build-demo.test.ts` | 1 | Static dashboard demo mirroring and fixture injection |
 | `sqlite-session-repository.test.ts` | 2 | Persistent session storage, enumeration, delete/clear |
 | `dashboard.test.ts` | 31 | Auth flow, session revoke, metrics, health endpoints, stats, config protection, async error handling |
 | `discord-message-format.test.ts` | 2 | Discord-safe chunking and metadata rendering |
@@ -355,6 +379,7 @@ Hooks are installed automatically on normal local Git checkouts. The `prepare` s
 | `usage.test.ts` | 26 | Cost calculation, budget estimate guard, per-server budget enforcement, global fallback, day rollover, runtime config access pattern |
 | `webhook-service.test.ts` | 4 | Stale webhook recovery, error classification, LRU webhook cache eviction |
 | `vertex-ai-client.test.ts` | 6 | Shared transport, timeout wiring, structured provider errors, health checks, endpoint resolution |
+| `version.test.ts` | 3 | Release metadata, GitHub latest-release checks, and update status fallback |
 | `store.test.ts` | 10 | SQLite persistence, legacy JSON import, defaults, copy safety, config-only reads, direct guild row operations |
 | `structured-logger.test.ts` | 2 | JSON shape, inherited request context, secret redaction |
 | `shutdown.test.ts` | 3 | Shutdown order, timeout forcing, signal deduplication |
@@ -415,8 +440,13 @@ The Dockerfile uses a **multi-stage build** with Node.js `22-alpine`:
 
 ### Operations Guides
 
+- [Deployment guide](docs/operations/deployment.md)
 - [Alerts runbook](docs/operations/alerts-runbook.md)
 - [SQLite backup and restore](docs/operations/sqlite-backup-restore.md)
+
+### 0.1.1 Release Notes
+
+Babel `0.1.1` adds a read-only static dashboard demo for GitHub Pages, Ko-fi support links for upstream maintenance, and dashboard update checks that turn the version badge yellow when a newer GitHub release is available.
 
 ### 0.1.0 Release Notes
 

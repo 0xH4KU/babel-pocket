@@ -217,6 +217,7 @@ describe('Dashboard API', () => {
     let sessionCookie: string;
     let csrfToken: string;
     let healthCheck: ReturnType<typeof vi.fn>;
+    let versionCheck: ReturnType<typeof vi.fn>;
     let runtimeLimiter: TranslationRuntimeLimiter;
     let log: TranslationLog;
 
@@ -230,6 +231,15 @@ describe('Dashboard API', () => {
             maxUserOutstanding: 1,
         });
         healthCheck = vi.fn().mockResolvedValue({ healthy: true, latencyMs: 24 });
+        versionCheck = vi.fn().mockResolvedValue({
+            version: '0.1.1',
+            repositoryUrl: 'https://github.com/0xH4KU/babel-discord-translator',
+            update: {
+                status: 'outdated',
+                latestVersion: '0.1.2',
+                latestUrl: 'https://github.com/0xH4KU/babel-discord-translator/releases/tag/v0.1.2',
+            },
+        });
         const cooldown = new CooldownManager(5);
         log = new TranslationLog(100);
         const guilds = [
@@ -251,6 +261,7 @@ describe('Dashboard API', () => {
             metrics,
             runtimeLimiter,
             healthCheck,
+            versionCheck,
             sessionRepository: new InMemorySessionRepository(),
         });
 
@@ -398,9 +409,15 @@ describe('Dashboard API', () => {
 
         expect(res.status).toBe(200);
         expect(res.body).toEqual({
-            version: '0.1.0',
+            version: '0.1.1',
             repositoryUrl: 'https://github.com/0xH4KU/babel-discord-translator',
+            update: {
+                status: 'outdated',
+                latestVersion: '0.1.2',
+                latestUrl: 'https://github.com/0xH4KU/babel-discord-translator/releases/tag/v0.1.2',
+            },
         });
+        expect(versionCheck).toHaveBeenCalled();
     });
 
     it('should expose Prometheus metrics without dashboard authentication', async () => {
@@ -438,7 +455,7 @@ describe('Dashboard API', () => {
             expect(res.status).toBe(200);
             expect(res.headers['content-type']).toContain('text/plain');
             expect(res.text).toContain(
-                'babel_app_version_info{version="0.1.0",repository_url="https://github.com/0xH4KU/babel-discord-translator"} 1',
+                'babel_app_version_info{version="0.1.1",repository_url="https://github.com/0xH4KU/babel-discord-translator"} 1',
             );
             expect(res.text).toContain('babel_translations_total');
             expect(res.text).toContain('babel_translation_failures_total');

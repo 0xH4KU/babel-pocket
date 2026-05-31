@@ -1,0 +1,88 @@
+import { describe, expect, it, vi } from 'vitest';
+import {
+    getVersionMetadataWithUpdate,
+    getVersionUpdateStatus,
+    _test,
+} from '../src/shared/version.js';
+
+function jsonResponse(body: unknown, init: ResponseInit = {}): Response {
+    return new Response(JSON.stringify(body), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+        ...init,
+    });
+}
+
+describe('version metadata', () => {
+    it('should report outdated when the latest release tag is newer', async () => {
+        _test.resetVersionUpdateCache();
+        const fetchImpl = vi.fn(async () =>
+            jsonResponse({
+                tag_name: 'v0.1.2',
+                html_url: 'https://github.com/0xH4KU/babel-discord-translator/releases/tag/v0.1.2',
+            }),
+        );
+
+        const update = await getVersionUpdateStatus({
+            currentVersion: '0.1.1',
+            fetchImpl,
+            latestReleaseUrl: 'https://example.test/releases/latest',
+            cacheTtlMs: 0,
+        });
+
+        expect(update).toEqual({
+            status: 'outdated',
+            latestVersion: '0.1.2',
+            latestUrl: 'https://github.com/0xH4KU/babel-discord-translator/releases/tag/v0.1.2',
+        });
+        expect(fetchImpl).toHaveBeenCalledWith('https://example.test/releases/latest', {
+            headers: {
+                Accept: 'application/vnd.github+json',
+                'User-Agent': 'babel-discord-translator',
+            },
+        });
+    });
+
+    it('should report current when the latest release matches the app version', async () => {
+        _test.resetVersionUpdateCache();
+        const fetchImpl = vi.fn(async () =>
+            jsonResponse({
+                tag_name: 'v0.1.1',
+                html_url: 'https://github.com/0xH4KU/babel-discord-translator/releases/tag/v0.1.1',
+            }),
+        );
+
+        const metadata = await getVersionMetadataWithUpdate({
+            currentVersion: '0.1.1',
+            fetchImpl,
+            latestReleaseUrl: 'https://example.test/releases/latest',
+            cacheTtlMs: 0,
+        });
+
+        expect(metadata).toEqual({
+            version: '0.1.1',
+            repositoryUrl: 'https://github.com/0xH4KU/babel-discord-translator',
+            update: {
+                status: 'current',
+                latestVersion: '0.1.1',
+                latestUrl: 'https://github.com/0xH4KU/babel-discord-translator/releases/tag/v0.1.1',
+            },
+        });
+    });
+
+    it('should return unknown when release lookup fails', async () => {
+        _test.resetVersionUpdateCache();
+        const fetchImpl = vi.fn(async () =>
+            jsonResponse({ message: 'rate limited' }, { status: 403 }),
+        );
+
+        const update = await getVersionUpdateStatus({
+            currentVersion: '0.1.1',
+            fetchImpl,
+            latestReleaseUrl: 'https://example.test/releases/latest',
+            cacheTtlMs: 0,
+        });
+
+        expect(update).toEqual({ status: 'unknown' });
+    });
+});

@@ -36,6 +36,9 @@ jobs:
       - name: Test with Coverage
         run: npm run test:coverage
 
+      - name: Build Dashboard Demo
+        run: npm run demo:build
+
       - name: Build
         run: npm run build
 
@@ -43,7 +46,7 @@ jobs:
         run: |
           test -f dist/src/index.js
           test -f dist/src/public/index.html
-          node --input-type=module -e "const v = await import('./dist/src/shared/version.js'); if (v.APP_VERSION !== '0.1.0') process.exit(1);"
+          node --input-type=module -e "const v = await import('./dist/src/shared/version.js'); if (v.APP_VERSION !== '0.1.1') process.exit(1);"
 
   docker:
     runs-on: ubuntu-latest
