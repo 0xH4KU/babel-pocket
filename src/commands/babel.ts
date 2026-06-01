@@ -63,6 +63,7 @@ export async function handleBabel(
             provider: result.provider,
             inputTokens: result.inputTokens,
             outputTokens: result.outputTokens,
+            includeOriginalPreview: true,
         }),
     );
 }

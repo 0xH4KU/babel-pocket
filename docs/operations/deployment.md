@@ -1,0 +1,139 @@
+# Babel Deployment Guide
+
+This guide covers common ways to run Babel as a self-hosted Discord translation bot. Babel does not proxy your traffic through a shared hosted bot: you provide the Discord bot token, dashboard password, hosting, and AI provider credentials.
+
+> Railway links may be affiliate or template links when provided. They help support Babel maintenance at no extra cost to you.
+
+## Before You Deploy
+
+You need:
+
+- A Discord application with a bot token
+- Node.js `22.5+` for local/VPS installs, or Docker for container installs
+- A dashboard password that is not `admin`
+- At least one configured translation provider in the dashboard after startup
+
+Babel does not require privileged Discord intents.
+
+## Discord Setup
+
+1. Open the [Discord Developer Portal](https://discord.com/developers/applications).
+2. Create an application.
+3. Open **Bot** and copy the bot token.
+4. Invite the bot with:
+
+```text
+https://discord.com/oauth2/authorize?client_id=YOUR_APP_ID&scope=bot+applications.commands
+```
+
+5. Register commands:
+
+```bash
+DISCORD_APP_ID=your_app_id DISCORD_BOT_TOKEN=your_token npm run register
+```
+
+This registers the `Babel` message context menu plus `/translate`, `/setlang`, `/mylang`, and `/help`.
+
+## Railway
+
+Railway is a good fit for small communities that want a hosted deployment without managing a VPS.
+
+Recommended environment variables:
+
+| Variable             | Value                    |
+| -------------------- | ------------------------ |
+| `DISCORD_TOKEN`      | Your Discord bot token   |
+| `DASHBOARD_PASSWORD` | A strong random password |
+| `DASHBOARD_PORT`     | `3000`                   |
+| `BABEL_DB_PATH`      | `/app/data/babel.sqlite` |
+| `NODE_ENV`           | `production`             |
+
+Use a persistent volume mounted at `/app/data` so SQLite survives restarts and redeploys.
+
+After deployment:
+
+1. Open the Railway public URL.
+2. Log in with `DASHBOARD_PASSWORD`.
+3. Complete the setup wizard.
+4. Register Discord commands from a local checkout or Railway shell with `npm run register`.
+5. Check `/readyz` and the dashboard Operations panel.
+
+## Docker / VPS
+
+Build and run:
+
+```bash
+docker build -t babel .
+docker run -d \
+  --name babel \
+  --env-file .env \
+  -p 3000:3000 \
+  -v babel-data:/app/data \
+  babel
+```
+
+Example `.env`:
+
+```env
+DISCORD_TOKEN=your_bot_token_here
+DASHBOARD_PORT=3000
+DASHBOARD_PASSWORD=replace_with_a_strong_password
+BABEL_DB_PATH=/app/data/babel.sqlite
+NODE_ENV=production
+```
+
+Verify:
+
+```bash
+curl -fsS http://localhost:3000/livez
+curl -fsS http://localhost:3000/readyz
+```
+
+## PM2
+
+For a direct Node.js install:
+
+```bash
+npm install
+npm run build
+pm2 start ecosystem.config.cjs
+pm2 save
+```
+
+Keep `data/babel.sqlite` backed up. See [SQLite backup and restore](sqlite-backup-restore.md).
+
+## Static Dashboard Demo
+
+The public dashboard demo is generated from the real dashboard assets with mock data:
+
+```bash
+npm run demo:build
+```
+
+The generated site lives in `docs/demo/`, so GitHub Pages can publish it from the `docs` folder. The demo is read-only, uses fixture JSON, and does not connect to Discord or any AI provider.
+
+When the dashboard UI changes, run `npm run demo:build` before committing to refresh the mirrored demo.
+
+## Operations Checks
+
+After any deploy:
+
+```bash
+curl -fsS http://localhost:3000/livez
+curl -fsS http://localhost:3000/readyz
+curl -fsS http://localhost:3000/metrics | head
+```
+
+In the dashboard, check:
+
+- Operations provider cards
+- Runtime queue pressure
+- Budget risk
+- Translation test
+- Server whitelist
+
+## Support
+
+Babel is free and self-hosted. If it saves setup time or helps your community avoid a hosted bot subscription, you can support upstream maintenance on Ko-fi:
+
+https://ko-fi.com/0xh4ku

@@ -12,6 +12,7 @@ import type { TranslationService } from './modules/translation/translation-servi
 import type { SessionRepository } from './modules/dashboard/auth/session-repository.js';
 import type { TranslationRuntimeLimiter } from './modules/translation/translation-runtime-limiter.js';
 import type { TranslationWebhookService } from './modules/translation/webhook-service.js';
+import type { VersionMetadataWithUpdate } from './shared/version.js';
 
 // --- Provider ---
 
@@ -170,6 +171,7 @@ export interface DashboardDeps {
     healthProbeCacheTtlMs?: number;
     healthCheck?: () => Promise<VertexAiHealthStatus>;
     openAiHealthCheck?: () => Promise<OpenAiHealthStatus>;
+    versionCheck?: () => Promise<VersionMetadataWithUpdate>;
     sessionRepository?: SessionRepository;
 }
 

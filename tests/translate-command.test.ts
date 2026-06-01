@@ -32,7 +32,7 @@ function createInteraction() {
 }
 
 describe('handleTranslate', () => {
-    it('should delegate webhook delivery to the webhook service and delete the deferred reply', async () => {
+    it('should send only the translated text through the public webhook', async () => {
         const webhookService = {
             sendTranslation: vi.fn().mockResolvedValue(undefined),
         };
@@ -45,6 +45,9 @@ describe('handleTranslate', () => {
                 cached: false,
                 targetLanguage: 'es',
                 langSource: 'option',
+                provider: 'openai',
+                inputTokens: 8,
+                outputTokens: 4,
             }),
         };
         const interaction = createInteraction();
@@ -64,7 +67,7 @@ describe('handleTranslate', () => {
         );
         expect(webhookService.sendTranslation).toHaveBeenCalledWith(
             expect.objectContaining({
-                content: expect.stringContaining('Target: `es`'),
+                content: 'Hola mundo',
             }),
         );
         expect(interaction.deleteReply).toHaveBeenCalledTimes(1);
@@ -104,10 +107,7 @@ describe('handleTranslate', () => {
         expect(webhookService.sendTranslation).not.toHaveBeenCalled();
         expect(interaction.deleteReply).not.toHaveBeenCalled();
         expect(interaction.editReply).toHaveBeenCalledWith({
-            content: expect.stringContaining('Hola mundo'),
-        });
-        expect(interaction.editReply).toHaveBeenCalledWith({
-            content: expect.stringContaining('Provider: `openai`'),
+            content: 'Hola mundo',
         });
     });
 });

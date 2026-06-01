@@ -10,6 +10,7 @@ export interface TranslationMessageOptions {
     provider?: string;
     inputTokens?: number;
     outputTokens?: number;
+    includeOriginalPreview?: boolean;
 }
 
 function quoteOriginalPreview(originalText: string): string {
@@ -19,26 +20,6 @@ function quoteOriginalPreview(originalText: string): string {
             : originalText;
 
     return `> ${preview.replace(/\n/g, '\n> ')}`;
-}
-
-function metadataLine({
-    targetLanguage,
-    cached,
-    provider,
-    inputTokens,
-    outputTokens,
-}: TranslationMessageOptions): string {
-    const parts = [`Target: \`${targetLanguage}\``, `Cache: \`${cached ? 'hit' : 'miss'}\``];
-
-    if (provider) {
-        parts.push(`Provider: \`${provider}\``);
-    }
-
-    if (inputTokens !== undefined && outputTokens !== undefined) {
-        parts.push(`Tokens: \`${inputTokens} in / ${outputTokens} out\``);
-    }
-
-    return parts.join(' | ');
 }
 
 function chunkText(text: string, firstLimit: number, continuationLimit: number): string[] {
@@ -57,16 +38,13 @@ function chunkText(text: string, firstLimit: number, continuationLimit: number):
 }
 
 export function buildTranslationMessages(options: TranslationMessageOptions): string[] {
-    const header = `${quoteOriginalPreview(options.originalText)}\n\n${metadataLine(options)}\n\n`;
+    if (!options.includeOriginalPreview) {
+        return chunkText(options.translatedText, DISCORD_MESSAGE_LIMIT, DISCORD_MESSAGE_LIMIT);
+    }
+
+    const header = `${quoteOriginalPreview(options.originalText)}\n\n`;
     const firstLimit = Math.max(DISCORD_MESSAGE_LIMIT - header.length, 1);
-    const continuationLimit = DISCORD_MESSAGE_LIMIT;
-    const chunks = chunkText(options.translatedText, firstLimit, continuationLimit);
+    const chunks = chunkText(options.translatedText, firstLimit, DISCORD_MESSAGE_LIMIT);
 
-    return chunks.map((chunk, index) => {
-        if (index === 0) {
-            return `${header}${chunk}`;
-        }
-
-        return chunk;
-    });
+    return chunks.map((chunk, index) => (index === 0 ? `${header}${chunk}` : chunk));
 }
