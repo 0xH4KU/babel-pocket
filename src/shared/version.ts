@@ -4,7 +4,7 @@ export const REPOSITORY_URL = 'https://github.com/0xH4KU/babel-discord-translato
 
 const LATEST_RELEASE_URL =
     'https://api.github.com/repos/0xH4KU/babel-discord-translator/releases/latest';
-const VERSION_UPDATE_CACHE_TTL_MS = 60 * 60 * 1000;
+const VERSION_UPDATE_CACHE_TTL_MS = 5 * 60 * 1000;
 
 export type VersionUpdateStatus =
     | {

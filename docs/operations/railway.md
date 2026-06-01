@@ -68,6 +68,22 @@ curl -fsS https://YOUR_RAILWAY_DOMAIN/livez
 
 `/readyz` may return `503` until setup is complete and the configured provider passes its readiness check.
 
+## Updates and Autodeploys
+
+Railway has two different update paths:
+
+- **Your own GitHub-connected service:** enable Railway GitHub autodeploys for the service source. Railway can build and deploy when the selected branch receives a new commit. If available for your project, enable the option to wait for GitHub Actions before deploying so failed CI does not roll out automatically.
+- **A service created from the Babel template:** upstream template changes do not force every deployed bot to update. Railway may show that the template has updates, but the project owner should review and apply the update manually. This avoids surprising self-hosters with database, environment, or behavior changes.
+
+Recommended template-user update flow:
+
+1. Back up `BABEL_DB_PATH` or the Railway volume before major upgrades.
+2. Review the [changelog](../../CHANGELOG.md).
+3. Apply the Railway template update, or redeploy the latest source if the project was connected to your own fork.
+4. Check `/livez`, `/readyz`, `/metrics`, and the dashboard after deployment.
+
+The dashboard version badge checks the latest GitHub release periodically. If a new release was published just after your running instance checked GitHub, the badge can stay gray for a few minutes until the cache refreshes or the service restarts.
+
 ## Register Discord Commands
 
 Register commands from a local checkout:

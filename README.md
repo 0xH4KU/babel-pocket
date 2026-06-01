@@ -371,7 +371,7 @@ Hooks are installed automatically on normal local Git checkouts. The `prepare` s
 
 ### Test Coverage
 
-242 tests across 29 suites covering all modules:
+243 tests across 29 suites covering all modules:
 
 | Suite | Tests | Covers |
 |---|---|---|
@@ -399,7 +399,7 @@ Hooks are installed automatically on normal local Git checkouts. The `prepare` s
 | `usage.test.ts` | 30 | Cost calculation, budget estimate guard, per-server budget enforcement, global fallback, day rollover, runtime config access pattern |
 | `webhook-service.test.ts` | 4 | Stale webhook recovery, error classification, LRU webhook cache eviction |
 | `vertex-ai-client.test.ts` | 6 | Shared transport, timeout wiring, structured provider errors, health checks, endpoint resolution |
-| `version.test.ts` | 3 | Release metadata, GitHub latest-release checks, and update status fallback |
+| `version.test.ts` | 4 | Release metadata, GitHub latest-release checks, cache refresh, and update status fallback |
 | `sqlite-database.test.ts` | 3 | SQLite connection, migrations, and pragma setup |
 | `store.test.ts` | 11 | SQLite persistence, legacy JSON import, defaults, copy safety, config-only reads, direct guild row operations |
 | `structured-logger.test.ts` | 2 | JSON shape, inherited request context, secret redaction |

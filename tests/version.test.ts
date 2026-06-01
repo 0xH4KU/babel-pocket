@@ -70,6 +70,59 @@ describe('version metadata', () => {
         });
     });
 
+    it('should refresh the latest release lookup after the cache TTL expires', async () => {
+        _test.resetVersionUpdateCache();
+        vi.useFakeTimers();
+        vi.setSystemTime(new Date('2026-06-01T00:00:00.000Z'));
+
+        const fetchImpl = vi
+            .fn()
+            .mockResolvedValueOnce(
+                jsonResponse({
+                    tag_name: 'v0.1.2',
+                    html_url:
+                        'https://github.com/0xH4KU/babel-discord-translator/releases/tag/v0.1.2',
+                }),
+            )
+            .mockResolvedValueOnce(
+                jsonResponse({
+                    tag_name: 'v0.1.3',
+                    html_url:
+                        'https://github.com/0xH4KU/babel-discord-translator/releases/tag/v0.1.3',
+                }),
+            );
+
+        try {
+            const first = await getVersionUpdateStatus({
+                currentVersion: '0.1.2',
+                fetchImpl,
+                latestReleaseUrl: 'https://example.test/releases/latest',
+            });
+
+            vi.setSystemTime(new Date('2026-06-01T00:10:00.000Z'));
+
+            const second = await getVersionUpdateStatus({
+                currentVersion: '0.1.2',
+                fetchImpl,
+                latestReleaseUrl: 'https://example.test/releases/latest',
+            });
+
+            expect(first).toEqual({
+                status: 'current',
+                latestVersion: '0.1.2',
+                latestUrl: 'https://github.com/0xH4KU/babel-discord-translator/releases/tag/v0.1.2',
+            });
+            expect(second).toEqual({
+                status: 'outdated',
+                latestVersion: '0.1.3',
+                latestUrl: 'https://github.com/0xH4KU/babel-discord-translator/releases/tag/v0.1.3',
+            });
+            expect(fetchImpl).toHaveBeenCalledTimes(2);
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
     it('should return unknown when release lookup fails', async () => {
         _test.resetVersionUpdateCache();
         const fetchImpl = vi.fn(async () =>
