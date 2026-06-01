@@ -24,6 +24,23 @@ export interface GuildBudgetConfig {
     dailyBudgetUsd: number;
 }
 
+export interface GuildGlossaryEntry {
+    id: number;
+    guildId: string;
+    sourceText: string;
+    targetText: string;
+    notes: string;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface GuildGlossaryInput {
+    id?: number;
+    sourceText: string;
+    targetText: string;
+    notes?: string;
+}
+
 export interface StoreData {
     vertexAiApiKey: string;
     gcpProject: string;

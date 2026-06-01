@@ -339,6 +339,72 @@
                     <div id="prefs-pagination"></div>
                 </div>
 
+                <div class="settings-section">
+                    <h3>Server Glossary</h3>
+                    <div class="desc-text">
+                        Configure server-specific term mappings. Use identical source and target
+                        text to preserve names, brands, or game terms.
+                    </div>
+                    <div class="settings-row">
+                        <div class="input-group">
+                            <label>Server</label>
+                            <select
+                                id="glossary-guild"
+                                class="settings-select"
+                                onchange="selectGlossaryGuild(this.value)"
+                            ></select>
+                        </div>
+                    </div>
+                    <div class="glossary-form">
+                        <input type="hidden" id="glossary-entry-id" />
+                        <div class="settings-row">
+                            <div class="input-group">
+                                <label>Source Term</label>
+                                <input
+                                    type="text"
+                                    id="glossary-source"
+                                    maxlength="120"
+                                    placeholder="OpenAI"
+                                />
+                            </div>
+                            <div class="input-group">
+                                <label>Target Term</label>
+                                <input
+                                    type="text"
+                                    id="glossary-target"
+                                    maxlength="120"
+                                    placeholder="OpenAI"
+                                />
+                            </div>
+                        </div>
+                        <div class="settings-row">
+                            <div class="input-group">
+                                <label>Notes</label>
+                                <input
+                                    type="text"
+                                    id="glossary-notes"
+                                    maxlength="200"
+                                    placeholder="Preserve brand name"
+                                />
+                            </div>
+                        </div>
+                        <div class="glossary-actions">
+                            <button class="btn btn-primary btn-sm" onclick="saveGlossaryEntry()">
+                                Save Term
+                            </button>
+                            <button
+                                class="btn btn-secondary btn-sm"
+                                onclick="resetGlossaryForm()"
+                            >
+                                Clear
+                            </button>
+                        </div>
+                    </div>
+                    <div id="glossary-container">
+                        <div class="empty-state">Select a server to manage glossary terms.</div>
+                    </div>
+                </div>
+
                 <div class="save-bar">
                     <span class="save-status" data-access-save-status
                         >No unsaved whitelist changes</span

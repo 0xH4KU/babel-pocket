@@ -12,6 +12,7 @@ RUN npm run build
 FROM node:22-alpine
 WORKDIR /app
 
+RUN apk add --no-cache sqlite
 RUN addgroup -S babel && adduser -S babel -G babel
 
 COPY --from=build /app/dist ./dist
@@ -26,6 +27,6 @@ USER babel
 EXPOSE 3000
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-    CMD wget -qO- http://localhost:3000/livez || exit 1
+    CMD wget -qO- "http://localhost:${PORT:-3000}/livez" || exit 1
 
 CMD ["node", "dist/src/index.js"]

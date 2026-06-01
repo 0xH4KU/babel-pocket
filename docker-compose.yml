@@ -1,0 +1,26 @@
+services:
+  babel:
+    build: .
+    image: babel-discord-translator:local
+    container_name: babel-translator
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      DASHBOARD_PORT: 3000
+      DASHBOARD_HOST: 0.0.0.0
+      BABEL_DB_PATH: /app/data/babel.sqlite
+    ports:
+      - "3000:3000"
+    volumes:
+      - babel_data:/app/data
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/livez"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  babel_data:

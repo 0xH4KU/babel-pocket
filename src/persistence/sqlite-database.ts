@@ -83,6 +83,26 @@ const MIGRATIONS: Migration[] = [
             `);
         },
     },
+    {
+        id: 2,
+        name: 'guild_glossary',
+        up(db) {
+            db.exec(`
+                CREATE TABLE IF NOT EXISTS guild_glossary (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    guild_id TEXT NOT NULL,
+                    source_text TEXT NOT NULL,
+                    target_text TEXT NOT NULL,
+                    notes TEXT NOT NULL DEFAULT '',
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_guild_glossary_lookup
+                    ON guild_glossary (guild_id, source_text);
+            `);
+        },
+    },
 ];
 
 let sharedDatabase: DatabaseSync | null = null;
@@ -183,6 +203,7 @@ const STORE_TABLES = new Set([
     'guild_daily_usage',
     'usage_history',
     'guild_usage_history',
+    'guild_glossary',
 ]);
 
 export function isSqliteStoreEmpty(db: DatabaseSync): boolean {

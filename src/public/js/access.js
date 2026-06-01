@@ -10,6 +10,8 @@ let manualGuildIds = [];
 let accessAllowedGuildIdsDraft = [];
 let accessWhitelistDirty = false;
 let accessWhitelistLoaded = false;
+let glossaryGuildId = '';
+let glossaryEntries = [];
 
 function normalizeGuildIds(ids) {
     return [...new Set((ids || []).map((id) => String(id).trim()).filter(Boolean))];
@@ -63,6 +65,7 @@ async function loadAccess() {
         allGuilds = await guildRes.json();
         guildBudgetData = await budgetRes.json();
         renderGuilds();
+        renderGlossaryGuildSelect();
         updateAccessSaveState();
         loadUserPrefs();
     } catch {}
@@ -275,7 +278,178 @@ function addManualGuild() {
 function removeManualGuild(id) {
     setAccessWhitelistDraft(accessAllowedGuildIdsDraft.filter((g) => g !== id));
     renderGuilds();
+    renderGlossaryGuildSelect();
     showToast('Guild removed — click Save to apply');
+}
+
+// ===== Server Glossary =====
+
+function getGlossaryGuildOptions() {
+    const known = allGuilds.map((g) => ({ id: g.id, name: g.name || g.id }));
+    const knownIds = new Set(known.map((g) => g.id));
+    const manual = accessAllowedGuildIdsDraft
+        .filter((id) => !knownIds.has(id))
+        .map((id) => ({ id, name: id }));
+
+    return [...known, ...manual].sort((a, b) => a.name.localeCompare(b.name));
+}
+
+function renderGlossaryGuildSelect() {
+    const select = document.getElementById('glossary-guild');
+    if (!select) return;
+
+    const options = getGlossaryGuildOptions();
+    if (options.length === 0) {
+        select.innerHTML = '<option value="">No servers available</option>';
+        glossaryGuildId = '';
+        glossaryEntries = [];
+        renderGlossaryEntries();
+        return;
+    }
+
+    if (!glossaryGuildId || !options.some((guild) => guild.id === glossaryGuildId)) {
+        glossaryGuildId = options[0].id;
+    }
+
+    select.innerHTML = options
+        .map(
+            (guild) =>
+                `<option value="${guild.id}" ${guild.id === glossaryGuildId ? 'selected' : ''}>${guild.name}</option>`,
+        )
+        .join('');
+
+    loadGlossaryEntries();
+}
+
+async function selectGlossaryGuild(guildId) {
+    glossaryGuildId = guildId || '';
+    resetGlossaryForm();
+    await loadGlossaryEntries();
+}
+
+async function loadGlossaryEntries() {
+    const container = document.getElementById('glossary-container');
+    if (!container || !glossaryGuildId) {
+        renderGlossaryEntries();
+        return;
+    }
+
+    try {
+        const res = await api('/guild-glossary/' + glossaryGuildId);
+        if (!res.ok) {
+            showToast('Failed to load glossary', true);
+            return;
+        }
+
+        const data = await res.json();
+        glossaryEntries = data.entries || [];
+        renderGlossaryEntries();
+    } catch {
+        showToast('Failed to load glossary', true);
+    }
+}
+
+function renderGlossaryEntries() {
+    const container = document.getElementById('glossary-container');
+    if (!container) return;
+
+    if (!glossaryGuildId) {
+        container.innerHTML = '<div class="empty-state">Select a server to manage glossary terms.</div>';
+        return;
+    }
+
+    if (glossaryEntries.length === 0) {
+        container.innerHTML = '<div class="empty-state">No glossary terms for this server yet.</div>';
+        return;
+    }
+
+    const rows = glossaryEntries
+        .map(
+            (entry) => `<tr>
+      <td class="mono">${entry.sourceText}</td>
+      <td class="mono">${entry.targetText}</td>
+      <td class="dim">${entry.notes || '-'}</td>
+      <td>
+        <button class="btn btn-secondary btn-xs" onclick="editGlossaryEntry(${entry.id})">Edit</button>
+        <button class="btn-danger" onclick="deleteGlossaryEntry(${entry.id})">Delete</button>
+      </td>
+    </tr>`,
+        )
+        .join('');
+
+    container.innerHTML = `<div class="table-scroll"><table class="data-table glossary-table">
+      <thead><tr><th>Source</th><th>Target</th><th>Notes</th><th></th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table></div>`;
+}
+
+function resetGlossaryForm() {
+    document.getElementById('glossary-entry-id').value = '';
+    document.getElementById('glossary-source').value = '';
+    document.getElementById('glossary-target').value = '';
+    document.getElementById('glossary-notes').value = '';
+}
+
+function editGlossaryEntry(entryId) {
+    const entry = glossaryEntries.find((item) => item.id === entryId);
+    if (!entry) return;
+
+    document.getElementById('glossary-entry-id').value = entry.id;
+    document.getElementById('glossary-source').value = entry.sourceText;
+    document.getElementById('glossary-target').value = entry.targetText;
+    document.getElementById('glossary-notes').value = entry.notes || '';
+}
+
+async function saveGlossaryEntry() {
+    if (!glossaryGuildId) {
+        showToast('Select a server first', true);
+        return;
+    }
+
+    const id = document.getElementById('glossary-entry-id').value;
+    const sourceText = document.getElementById('glossary-source').value.trim();
+    const targetText = document.getElementById('glossary-target').value.trim();
+    const notes = document.getElementById('glossary-notes').value.trim();
+
+    if (!sourceText || !targetText) {
+        showToast('Source and target are required', true);
+        return;
+    }
+
+    const res = await api('/guild-glossary/' + glossaryGuildId, {
+        method: 'POST',
+        body: JSON.stringify({
+            ...(id ? { id: Number(id) } : {}),
+            sourceText,
+            targetText,
+            notes,
+        }),
+    });
+
+    if (res.ok) {
+        resetGlossaryForm();
+        await loadGlossaryEntries();
+        showToast('Glossary term saved');
+    } else {
+        const data = await res.json().catch(() => ({}));
+        showToast(data.error || 'Save failed', true);
+    }
+}
+
+async function deleteGlossaryEntry(entryId) {
+    if (!glossaryGuildId) return;
+
+    const res = await api('/guild-glossary/' + glossaryGuildId + '/' + entryId, {
+        method: 'DELETE',
+    });
+
+    if (res.ok) {
+        glossaryEntries = glossaryEntries.filter((entry) => entry.id !== entryId);
+        renderGlossaryEntries();
+        showToast('Glossary term deleted');
+    } else {
+        showToast('Delete failed', true);
+    }
 }
 
 // ===== User Preferences =====

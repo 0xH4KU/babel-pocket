@@ -71,6 +71,39 @@ describe('config validation', () => {
         });
     });
 
+    it('should prefer Railway PORT over DASHBOARD_PORT when both are set', async () => {
+        const logger = createLoggerMock();
+        const { validateEnv } = await import('../src/modules/config/config.js');
+
+        const config = validateEnv(
+            {
+                DISCORD_TOKEN: 'test-token',
+                PORT: '4123',
+                DASHBOARD_PORT: '3000',
+                DASHBOARD_PASSWORD: 'strong-password',
+            },
+            { logger, nodeEnv: 'production' },
+        );
+
+        expect(config.dashboardPort).toBe(4123);
+    });
+
+    it('should include dashboardHost for platform public networking binds', async () => {
+        const logger = createLoggerMock();
+        const { validateEnv } = await import('../src/modules/config/config.js');
+
+        const config = validateEnv(
+            {
+                DISCORD_TOKEN: 'test-token',
+                DASHBOARD_HOST: '0.0.0.0',
+                DASHBOARD_PASSWORD: 'strong-password',
+            },
+            { logger, nodeEnv: 'production' },
+        );
+
+        expect(config.dashboardHost).toBe('0.0.0.0');
+    });
+
     it('should warn and allow the default dashboard password in development', async () => {
         const logger = createLoggerMock();
         const { validateEnv } = await import('../src/modules/config/config.js');

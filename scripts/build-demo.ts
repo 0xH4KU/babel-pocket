@@ -438,6 +438,39 @@ const DEMO_USER_PREFS = {
     '200000000000000005': 'es',
 };
 
+const DEMO_GLOSSARY = {
+    entries: [
+        {
+            id: 1,
+            guildId: '100000000000000001',
+            sourceText: 'Babel',
+            targetText: 'Babel',
+            notes: 'Preserve project name',
+            createdAt: '2026-06-01T00:00:00.000Z',
+            updatedAt: '2026-06-01T00:00:00.000Z',
+        },
+        {
+            id: 2,
+            guildId: '100000000000000001',
+            sourceText: 'release notes',
+            targetText: '版本公告',
+            notes: 'Community wording',
+            createdAt: '2026-06-01T00:00:00.000Z',
+            updatedAt: '2026-06-01T00:00:00.000Z',
+        },
+        {
+            id: 3,
+            guildId: '100000000000000001',
+            sourceText: 'raid',
+            targetText: '團本',
+            notes: 'Game term',
+            createdAt: '2026-06-01T00:00:00.000Z',
+            updatedAt: '2026-06-01T00:00:00.000Z',
+        },
+    ],
+    count: 3,
+};
+
 const DEMO_VERSION = {
     version: '0.1.1',
     repositoryUrl: 'https://github.com/0xH4KU/babel-discord-translator',
@@ -529,6 +562,7 @@ export function buildDashboardDemo({
         prefs: DEMO_USER_PREFS,
         count: Object.keys(DEMO_USER_PREFS).length,
     });
+    writeJson(join(fixtureDir, 'guild-glossary.json'), DEMO_GLOSSARY);
     writeJson(join(fixtureDir, 'sessions.json'), {
         sessions: [
             {
@@ -599,6 +633,10 @@ const DEMO_API_JS = `
     '/usage/history': 'history.json',
     '/logs': 'logs.json',
     '/user-prefs': 'user-prefs.json',
+    '/guild-glossary/100000000000000001': 'guild-glossary.json',
+    '/guild-glossary/100000000000000002': { entries: [], count: 0 },
+    '/guild-glossary/100000000000000003': { entries: [], count: 0 },
+    '/guild-glossary/100000000000000004': { entries: [], count: 0 },
     '/sessions': 'sessions.json'
   };
 

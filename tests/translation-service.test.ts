@@ -105,6 +105,25 @@ function createUsageMock() {
     };
 }
 
+function createGlossaryRepositoryMock(
+    entries: Record<
+        string,
+        Array<{
+            id: number;
+            guildId: string;
+            sourceText: string;
+            targetText: string;
+            notes: string;
+            createdAt: string;
+            updatedAt: string;
+        }>
+    > = {},
+) {
+    return {
+        listEntries: vi.fn((guildId: string) => entries[guildId] ?? []),
+    };
+}
+
 function createService({
     storeOverrides,
     translator = vi.fn(
@@ -115,12 +134,14 @@ function createService({
         }),
     ),
     usageTracker = createUsageMock(),
+    glossaryRepository = createGlossaryRepositoryMock(),
     loggerState = createStructuredLoggerMock(),
     runtimeLimiter,
 }: {
     storeOverrides?: Partial<StoreData>;
     translator?: ReturnType<typeof vi.fn>;
     usageTracker?: ReturnType<typeof createUsageMock>;
+    glossaryRepository?: ReturnType<typeof createGlossaryRepositoryMock>;
     loggerState?: ReturnType<typeof createStructuredLoggerMock>;
     runtimeLimiter?: TranslationRuntimeLimiter;
 } = {}) {
@@ -140,6 +161,7 @@ function createService({
         configStore,
         userPreferenceStore,
         usageTracker,
+        glossaryRepository,
         translator,
         metrics,
         runtimeLimiter,
@@ -155,6 +177,7 @@ function createService({
         configStore,
         userPreferenceStore,
         usageTracker,
+        glossaryRepository,
         translator,
         metrics,
         loggerState,
@@ -307,6 +330,113 @@ describe('TranslationService', () => {
             translationApiCallsTotal: 1,
             translationCacheHitsTotal: 1,
             translationCacheHitRate: 0.5,
+        });
+    });
+
+    it('should include per-guild glossary entries in translator options and cache keys', async () => {
+        const translator = vi
+            .fn()
+            .mockResolvedValueOnce({
+                text: 'Keep OpenAI and translate raid as 團本',
+                inputTokens: 20,
+                outputTokens: 10,
+            })
+            .mockResolvedValueOnce({
+                text: 'Keep OpenAI and translate raid as レイド',
+                inputTokens: 22,
+                outputTokens: 11,
+            });
+        const glossaryRepository = createGlossaryRepositoryMock({
+            'guild-1': [
+                {
+                    id: 1,
+                    guildId: 'guild-1',
+                    sourceText: 'OpenAI',
+                    targetText: 'OpenAI',
+                    notes: 'Preserve brand name',
+                    createdAt: '2026-06-01T00:00:00.000Z',
+                    updatedAt: '2026-06-01T00:00:00.000Z',
+                },
+                {
+                    id: 2,
+                    guildId: 'guild-1',
+                    sourceText: 'raid',
+                    targetText: '團本',
+                    notes: '',
+                    createdAt: '2026-06-01T00:00:00.000Z',
+                    updatedAt: '2026-06-01T00:00:00.000Z',
+                },
+            ],
+        });
+        const { service } = createService({ translator, glossaryRepository });
+
+        const first = await service.process({
+            command: 'translate',
+            commandLabel: '/translate',
+            guildId: 'guild-1',
+            guildName: 'Test Guild',
+            userId: 'user1',
+            userTag: 'user#0001',
+            locale: 'zh-TW',
+            text: 'OpenAI raid tonight',
+            targetLanguageOption: 'zh-TW',
+        });
+        const second = await service.process({
+            command: 'translate',
+            commandLabel: '/translate',
+            guildId: 'guild-1',
+            guildName: 'Test Guild',
+            userId: 'user2',
+            userTag: 'user#0002',
+            locale: 'zh-TW',
+            text: 'OpenAI raid tonight',
+            targetLanguageOption: 'zh-TW',
+        });
+
+        glossaryRepository.listEntries.mockReturnValueOnce([
+            {
+                id: 1,
+                guildId: 'guild-1',
+                sourceText: 'OpenAI',
+                targetText: 'OpenAI',
+                notes: 'Preserve brand name',
+                createdAt: '2026-06-01T00:00:00.000Z',
+                updatedAt: '2026-06-01T00:00:00.000Z',
+            },
+            {
+                id: 2,
+                guildId: 'guild-1',
+                sourceText: 'raid',
+                targetText: 'レイド',
+                notes: '',
+                createdAt: '2026-06-01T00:00:00.000Z',
+                updatedAt: '2026-06-01T00:10:00.000Z',
+            },
+        ]);
+
+        const third = await service.process({
+            command: 'translate',
+            commandLabel: '/translate',
+            guildId: 'guild-1',
+            guildName: 'Test Guild',
+            userId: 'user3',
+            userTag: 'user#0003',
+            locale: 'zh-TW',
+            text: 'OpenAI raid tonight',
+            targetLanguageOption: 'zh-TW',
+        });
+
+        expect(first.status).toBe('success');
+        expect(second.status).toBe('success');
+        expect(third.status).toBe('success');
+        expect(second.status === 'success' ? second.cached : false).toBe(true);
+        expect(third.status === 'success' ? third.cached : true).toBe(false);
+        expect(translator).toHaveBeenCalledTimes(2);
+        expect(translator.mock.calls[0]?.[2]).toMatchObject({
+            glossaryEntries: [
+                { sourceText: 'OpenAI', targetText: 'OpenAI', notes: 'Preserve brand name' },
+                { sourceText: 'raid', targetText: '團本', notes: '' },
+            ],
         });
     });
 

@@ -317,6 +317,54 @@ describe('UsageTracker', () => {
             expect(usage.isBudgetExceeded('guild-456')).toBe(true);
         });
 
+        it('should enforce a shared global budget for guilds without a custom budget', () => {
+            mockData.dailyBudgetUsd = 1.0;
+            mockData.guildBudgets = {};
+            mockData.inputPricePerMillion = 1.0;
+            mockData.outputPricePerMillion = 0;
+
+            usage.record(600_000, 0, 'guild-A');
+            usage.record(400_000, 0, 'guild-B');
+
+            expect(usage.isBudgetExceeded('guild-A')).toBe(true);
+            expect(usage.isBudgetExceeded('guild-B')).toBe(true);
+        });
+
+        it('should keep custom guild usage out of the shared global budget pool', () => {
+            mockData.dailyBudgetUsd = 0.5;
+            mockData.guildBudgets = { 'guild-custom': { dailyBudgetUsd: 2.0 } };
+            mockData.inputPricePerMillion = 1.0;
+            mockData.outputPricePerMillion = 0;
+
+            usage.record(600_000, 0, 'guild-custom');
+
+            expect(usage.isBudgetExceeded('guild-global')).toBe(false);
+            expect(
+                usage.wouldExceedBudget({
+                    estimatedInputTokens: 400_000,
+                    estimatedOutputTokens: 0,
+                    guildId: 'guild-global',
+                }),
+            ).toBe(false);
+        });
+
+        it('should block estimated requests against the shared global budget pool', () => {
+            mockData.dailyBudgetUsd = 1.0;
+            mockData.guildBudgets = {};
+            mockData.inputPricePerMillion = 1.0;
+            mockData.outputPricePerMillion = 0;
+
+            usage.record(600_000, 0, 'guild-A');
+
+            expect(
+                usage.wouldExceedBudget({
+                    estimatedInputTokens: 400_000,
+                    estimatedOutputTokens: 0,
+                    guildId: 'guild-B',
+                }),
+            ).toBe(true);
+        });
+
         it('should read runtime config once per budget check without falling back to getAll', () => {
             mockData.dailyBudgetUsd = 1.0;
             mockData.inputPricePerMillion = 1.0;
@@ -338,6 +386,23 @@ describe('UsageTracker', () => {
             usage.record(1_000_000, 0, 'guild-rich'); // $1 cost < $5 guild budget
 
             expect(usage.isBudgetExceeded('guild-rich')).toBe(false);
+        });
+
+        it('should estimate custom guild budgets independently from the global budget pool', () => {
+            mockData.dailyBudgetUsd = 0.5;
+            mockData.guildBudgets = { 'guild-custom': { dailyBudgetUsd: 2.0 } };
+            mockData.inputPricePerMillion = 1.0;
+            mockData.outputPricePerMillion = 0;
+
+            usage.record(600_000, 0, 'guild-global');
+
+            expect(
+                usage.wouldExceedBudget({
+                    estimatedInputTokens: 1_000_000,
+                    estimatedOutputTokens: 0,
+                    guildId: 'guild-custom',
+                }),
+            ).toBe(false);
         });
 
         it('should report guild budget not exceeded when guild budget is 0 (unlimited)', () => {
