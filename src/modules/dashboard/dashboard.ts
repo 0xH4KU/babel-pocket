@@ -697,6 +697,15 @@ export function createDashboardApp({
         }),
     );
 
+    app.post(
+        '/api/version/refresh',
+        auth.requireAuth,
+        auth.requireCsrf,
+        asyncHandler(async (_req: Request, res: Response) => {
+            res.json(await versionCheck({ forceRefresh: true }));
+        }),
+    );
+
     app.get('/api/sessions', auth.requireAuth, (req: Request, res: Response) => {
         res.json({ sessions: auth.listSessions(req) });
     });

@@ -4,7 +4,7 @@ export const REPOSITORY_URL = 'https://github.com/0xH4KU/babel-discord-translato
 
 const LATEST_RELEASE_URL =
     'https://api.github.com/repos/0xH4KU/babel-discord-translator/releases/latest';
-const VERSION_UPDATE_CACHE_TTL_MS = 5 * 60 * 1000;
+const VERSION_UPDATE_CACHE_TTL_MS = 60 * 60 * 1000;
 
 export type VersionUpdateStatus =
     | {
@@ -35,6 +35,7 @@ interface VersionUpdateOptions {
     latestReleaseUrl?: string;
     cacheTtlMs?: number;
     fetchImpl?: typeof fetch;
+    forceRefresh?: boolean;
 }
 
 let versionUpdateCache: {
@@ -75,9 +76,11 @@ export async function getVersionUpdateStatus({
     latestReleaseUrl = LATEST_RELEASE_URL,
     cacheTtlMs = VERSION_UPDATE_CACHE_TTL_MS,
     fetchImpl = fetch,
+    forceRefresh = false,
 }: VersionUpdateOptions = {}): Promise<VersionUpdateStatus> {
     const now = Date.now();
     if (
+        !forceRefresh &&
         versionUpdateCache &&
         versionUpdateCache.currentVersion === currentVersion &&
         now - versionUpdateCache.checkedAt < cacheTtlMs

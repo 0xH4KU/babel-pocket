@@ -82,7 +82,7 @@ Recommended template-user update flow:
 3. Apply the Railway template update, or redeploy the latest source if the project was connected to your own fork.
 4. Check `/livez`, `/readyz`, `/metrics`, and the dashboard after deployment.
 
-The dashboard version badge checks the latest GitHub release periodically. If a new release was published just after your running instance checked GitHub, the badge can stay gray for a few minutes until the cache refreshes or the service restarts.
+The dashboard version badge checks the latest GitHub release periodically and caches that result for one hour. If a new release was published just after your running instance checked GitHub, the badge can stay gray until the cache refreshes. Use the refresh button beside the version badge to force a fresh check when you are preparing an update.
 
 ## Register Discord Commands
 

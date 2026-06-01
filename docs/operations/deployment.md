@@ -60,7 +60,7 @@ After deployment:
 
 For the one-click template checklist, persistent volume notes, and affiliate disclosure wording, see [Railway deployment](railway.md).
 
-Railway autodeploys apply to services connected directly to a GitHub repository and branch. Services created from the Babel template should be treated as self-hosted installs: review upstream changes, back up the SQLite volume, then apply the template update or redeploy intentionally. Babel's dashboard version badge checks GitHub releases and may take a few minutes to turn yellow after a new release is published.
+Railway autodeploys apply to services connected directly to a GitHub repository and branch. Services created from the Babel template should be treated as self-hosted installs: review upstream changes, back up the SQLite volume, then apply the template update or redeploy intentionally. Babel's dashboard version badge checks GitHub releases hourly; use the refresh button beside the badge for an immediate update check.
 
 ## Docker / VPS
 

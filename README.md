@@ -371,7 +371,7 @@ Hooks are installed automatically on normal local Git checkouts. The `prepare` s
 
 ### Test Coverage
 
-243 tests across 29 suites covering all modules:
+245 tests across 29 suites covering all modules:
 
 | Suite | Tests | Covers |
 |---|---|---|
@@ -388,7 +388,7 @@ Hooks are installed automatically on normal local Git checkouts. The `prepare` s
 | `prepare-husky.test.ts` | 5 | Husky prepare skip logic for CI, missing git metadata, Windows/local execution |
 | `build-demo.test.ts` | 1 | Static dashboard demo mirroring and fixture injection |
 | `sqlite-session-repository.test.ts` | 2 | Persistent session storage, enumeration, delete/clear |
-| `dashboard.test.ts` | 37 | Auth flow, session revoke, metrics, health endpoints, stats, config protection, async error handling |
+| `dashboard.test.ts` | 39 | Auth flow, session revoke, metrics, health endpoints, stats, config protection, version refresh, async error handling |
 | `discord-message-format.test.ts` | 3 | Discord-safe chunking and metadata rendering |
 | `message-extraction.test.ts` | 3 | Context menu extraction from content, embeds, attachments, and referenced context |
 | `provider-orchestrator.test.ts` | 5 | Provider fallback ordering, structured errors, and circuit breaker behavior |

@@ -627,6 +627,7 @@ const DEMO_API_JS = `
     '/stats': 'stats.json',
     '/health': 'health.json',
     '/version': 'version.json',
+    '/version/refresh': 'version.json',
     '/config': 'config.json',
     '/guilds': 'guilds.json',
     '/guild-budgets': 'guild-budgets.json',
@@ -659,14 +660,14 @@ const DEMO_API_JS = `
   window.BABEL_DEMO = true;
   window.api = async function demoApi(path, opts) {
     const method = (opts && opts.method ? opts.method : 'GET').toUpperCase();
-    if (method !== 'GET') {
-      return jsonResponse({ ok: true, demo: true, message: 'Demo mode: changes are disabled.' });
-    }
-
     const route = normalizePath(path);
     const fixture = fixtureMap[route];
     if (!fixture) {
       return jsonResponse({ error: 'No demo fixture for ' + route }, 404);
+    }
+
+    if (method !== 'GET' && route !== '/version/refresh') {
+      return jsonResponse({ ok: true, demo: true, message: 'Demo mode: changes are disabled.' });
     }
 
     if (typeof fixture === 'string') {

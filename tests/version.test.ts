@@ -70,7 +70,7 @@ describe('version metadata', () => {
         });
     });
 
-    it('should refresh the latest release lookup after the cache TTL expires', async () => {
+    it('should refresh the latest release lookup when forced before the cache TTL expires', async () => {
         _test.resetVersionUpdateCache();
         vi.useFakeTimers();
         vi.setSystemTime(new Date('2026-06-01T00:00:00.000Z'));
@@ -99,12 +99,11 @@ describe('version metadata', () => {
                 latestReleaseUrl: 'https://example.test/releases/latest',
             });
 
-            vi.setSystemTime(new Date('2026-06-01T00:10:00.000Z'));
-
             const second = await getVersionUpdateStatus({
                 currentVersion: '0.1.2',
                 fetchImpl,
                 latestReleaseUrl: 'https://example.test/releases/latest',
+                forceRefresh: true,
             });
 
             expect(first).toEqual({

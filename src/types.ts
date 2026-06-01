@@ -188,7 +188,7 @@ export interface DashboardDeps {
     healthProbeCacheTtlMs?: number;
     healthCheck?: () => Promise<VertexAiHealthStatus>;
     openAiHealthCheck?: () => Promise<OpenAiHealthStatus>;
-    versionCheck?: () => Promise<VersionMetadataWithUpdate>;
+    versionCheck?: (options?: { forceRefresh?: boolean }) => Promise<VersionMetadataWithUpdate>;
     sessionRepository?: SessionRepository;
 }
 

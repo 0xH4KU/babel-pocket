@@ -669,6 +669,47 @@ describe('Dashboard API', () => {
         expect(versionCheck).toHaveBeenCalled();
     });
 
+    it('should force-refresh release metadata for authenticated admins with CSRF', async () => {
+        versionCheck.mockClear();
+        versionCheck.mockResolvedValueOnce({
+            version: '0.1.2',
+            repositoryUrl: 'https://github.com/0xH4KU/babel-discord-translator',
+            update: {
+                status: 'outdated',
+                latestVersion: '0.1.3',
+                latestUrl: 'https://github.com/0xH4KU/babel-discord-translator/releases/tag/v0.1.3',
+            },
+        });
+
+        const res = await request(server, 'POST', '/api/version/refresh', {
+            cookie: sessionCookie,
+            csrf: csrfToken,
+        });
+
+        expect(res.status).toBe(200);
+        expect(res.body).toEqual({
+            version: '0.1.2',
+            repositoryUrl: 'https://github.com/0xH4KU/babel-discord-translator',
+            update: {
+                status: 'outdated',
+                latestVersion: '0.1.3',
+                latestUrl: 'https://github.com/0xH4KU/babel-discord-translator/releases/tag/v0.1.3',
+            },
+        });
+        expect(versionCheck).toHaveBeenCalledWith({ forceRefresh: true });
+    });
+
+    it('should reject release metadata refresh without CSRF', async () => {
+        versionCheck.mockClear();
+
+        const res = await request(server, 'POST', '/api/version/refresh', {
+            cookie: sessionCookie,
+        });
+
+        expect(res.status).toBe(403);
+        expect(versionCheck).not.toHaveBeenCalled();
+    });
+
     it('should expose Prometheus metrics without dashboard authentication', async () => {
         metrics.recordTranslationSuccess({ cached: true });
         metrics.recordTranslationFailure();
