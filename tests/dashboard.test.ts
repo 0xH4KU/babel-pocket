@@ -249,7 +249,17 @@ describe('Dashboard API', () => {
         ];
         const mockClient = {
             user: { tag: 'Babel#1234', displayAvatarURL: () => 'https://example.com/avatar.png' },
-            guilds: { cache: { size: guilds.length, map: (fn: Function) => guilds.map(fn) } },
+            guilds: {
+                cache: {
+                    size: guilds.length,
+                    map: (fn: Function) => guilds.map(fn),
+                    [Symbol.iterator]: function* () {
+                        for (const guild of guilds) {
+                            yield [guild.id, guild];
+                        }
+                    },
+                },
+            },
         } as unknown as Client;
 
         app = createDashboardApp({
@@ -387,6 +397,178 @@ describe('Dashboard API', () => {
             (res.body!.runtime as Record<string, Record<string, unknown>>).limits.maxConcurrent,
         ).toBe(2);
         expect((res.body!.bot as Record<string, unknown>).memory).toBeDefined();
+    });
+
+    it('should show shared global budget usage for guilds without custom budgets', async () => {
+        usageMock.getStats.mockReturnValueOnce({
+            date: '2025-03-01',
+            inputTokens: 1_000_000,
+            outputTokens: 0,
+            requests: 10,
+            inputCost: 1,
+            outputCost: 0,
+            totalCost: 1,
+            dailyBudget: 1,
+            budgetUsedPercent: 100,
+            budgetExceeded: true,
+        });
+        usageMock.getGuildStatsForGuilds.mockReturnValueOnce({
+            'guild-1': {
+                date: '2025-03-01',
+                inputTokens: 600_000,
+                outputTokens: 0,
+                requests: 6,
+                inputCost: 0.6,
+                outputCost: 0,
+                totalCost: 0.6,
+                dailyBudget: 1,
+                budgetUsedPercent: 60,
+                budgetExceeded: false,
+            },
+            'guild-2': {
+                date: '2025-03-01',
+                inputTokens: 400_000,
+                outputTokens: 0,
+                requests: 4,
+                inputCost: 0.4,
+                outputCost: 0,
+                totalCost: 0.4,
+                dailyBudget: 1,
+                budgetUsedPercent: 40,
+                budgetExceeded: false,
+            },
+        });
+
+        const res = await request(server, 'GET', '/api/stats', {
+            cookie: sessionCookie,
+        });
+
+        expect(res.status).toBe(200);
+        const guildBudgets = res.body!.guildBudgets as Array<Record<string, unknown>>;
+        const guildOne = guildBudgets.find((guild) => guild.id === 'guild-1');
+        const guildTwo = guildBudgets.find((guild) => guild.id === 'guild-2');
+
+        expect(guildOne).toMatchObject({
+            isCustom: false,
+            budget: 1,
+            totalCost: 1,
+            requests: 10,
+            exceeded: true,
+        });
+        expect(guildTwo).toMatchObject({
+            isCustom: false,
+            budget: 1,
+            totalCost: 1,
+            requests: 10,
+            exceeded: true,
+        });
+    });
+
+    it('should return shared global budget usage from guild budget API', async () => {
+        usageMock.getStats.mockReturnValueOnce({
+            date: '2025-03-01',
+            inputTokens: 1_000_000,
+            outputTokens: 0,
+            requests: 10,
+            inputCost: 1,
+            outputCost: 0,
+            totalCost: 1,
+            dailyBudget: 1,
+            budgetUsedPercent: 100,
+            budgetExceeded: true,
+        });
+        usageMock.getGuildStatsForGuilds.mockReturnValueOnce({
+            'guild-1': {
+                date: '2025-03-01',
+                inputTokens: 600_000,
+                outputTokens: 0,
+                requests: 6,
+                inputCost: 0.6,
+                outputCost: 0,
+                totalCost: 0.6,
+                dailyBudget: 1,
+                budgetUsedPercent: 60,
+                budgetExceeded: false,
+            },
+        });
+
+        const res = await request(server, 'GET', '/api/guild-budgets', {
+            cookie: sessionCookie,
+        });
+
+        expect(res.status).toBe(200);
+        const guildOne = (res.body!['guild-1'] as Record<string, unknown>).usage as Record<
+            string,
+            unknown
+        >;
+
+        expect(guildOne).toMatchObject({
+            totalCost: 1,
+            requests: 10,
+            budgetExceeded: true,
+        });
+    });
+
+    it('should show custom guild budget usage separately from the global budget pool', async () => {
+        const { store } = await import('../src/store.js');
+        const previousGuildBudgets = store.get('guildBudgets');
+
+        usageMock.getStats.mockReturnValueOnce({
+            date: '2025-03-01',
+            inputTokens: 800_000,
+            outputTokens: 0,
+            requests: 8,
+            inputCost: 0.8,
+            outputCost: 0,
+            totalCost: 0.8,
+            dailyBudget: 1,
+            budgetUsedPercent: 80,
+            budgetExceeded: false,
+        });
+        usageMock.getGuildStatsForGuilds.mockReturnValueOnce({
+            'guild-1': {
+                date: '2025-03-01',
+                inputTokens: 200_000,
+                outputTokens: 0,
+                requests: 2,
+                inputCost: 0.2,
+                outputCost: 0,
+                totalCost: 0.2,
+                dailyBudget: 2,
+                budgetUsedPercent: 10,
+                budgetExceeded: false,
+            },
+        });
+
+        try {
+            store.update({ guildBudgets: { 'guild-1': { dailyBudgetUsd: 2 } } });
+
+            const res = await request(server, 'GET', '/api/stats', {
+                cookie: sessionCookie,
+            });
+
+            expect(res.status).toBe(200);
+            const guildBudgets = res.body!.guildBudgets as Array<Record<string, unknown>>;
+            const guildOne = guildBudgets.find((guild) => guild.id === 'guild-1');
+            const guildTwo = guildBudgets.find((guild) => guild.id === 'guild-2');
+
+            expect(guildOne).toMatchObject({
+                isCustom: true,
+                budget: 2,
+                totalCost: 0.2,
+                requests: 2,
+                exceeded: false,
+            });
+            expect(guildTwo).toMatchObject({
+                isCustom: false,
+                budget: 1,
+                totalCost: 0.8,
+                requests: 8,
+                exceeded: false,
+            });
+        } finally {
+            store.update({ guildBudgets: previousGuildBudgets });
+        }
     });
 
     it('should cache readiness probes within the configured health TTL', async () => {

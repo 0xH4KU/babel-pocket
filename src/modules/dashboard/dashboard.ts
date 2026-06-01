@@ -685,11 +685,14 @@ export function createDashboardApp({
         const guildStatsById = guildIds.length > 0 ? usage.getGuildStatsForGuilds(guildIds) : {};
         const guildBudgetList = client.guilds.cache.map((guild) => {
             const guildCfg = guildBudgetConfigs[guild.id];
-            const hasCustom = guildCfg && guildCfg.dailyBudgetUsd !== undefined;
+            const hasCustom = Boolean(guildCfg && guildCfg.dailyBudgetUsd !== undefined);
             const guildStats = guildStatsById[guild.id];
-            const budget = guildStats?.dailyBudget ?? usageStats.dailyBudget;
-            const totalCost = guildStats?.totalCost ?? 0;
-            const requests = guildStats?.requests ?? 0;
+            const scopedStats = hasCustom ? guildStats : usageStats;
+            const budget = hasCustom
+                ? guildCfg?.dailyBudgetUsd ?? 0
+                : scopedStats?.dailyBudget ?? usageStats.dailyBudget;
+            const totalCost = scopedStats?.totalCost ?? 0;
+            const requests = scopedStats?.requests ?? 0;
             return {
                 id: guild.id,
                 name: guild.name,
@@ -826,6 +829,7 @@ export function createDashboardApp({
         const guildBudgets = guildBudgetRepository.listBudgets();
         const guilds = client.guilds.cache;
         const guildIds = guilds.map((guild) => guild.id);
+        const usageStats = usage.getStats();
         const guildStatsById = guildIds.length > 0 ? usage.getGuildStatsForGuilds(guildIds) : {};
         const result: Record<
             string,
@@ -833,10 +837,11 @@ export function createDashboardApp({
         > = {};
 
         for (const [id, guild] of guilds) {
+            const hasCustom = guildBudgets[id]?.dailyBudgetUsd !== undefined;
             result[id] = {
                 name: guild.name,
                 budget: guildBudgets[id]?.dailyBudgetUsd ?? -1,
-                usage: guildStatsById[id] ?? usage.getGuildStats(id),
+                usage: hasCustom ? (guildStatsById[id] ?? usage.getGuildStats(id)) : usageStats,
             };
         }
         res.json(result);

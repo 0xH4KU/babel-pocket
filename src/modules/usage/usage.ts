@@ -104,17 +104,7 @@ class UsageTracker {
      */
     isBudgetExceeded(guildId?: string | null): boolean {
         const runtimeConfig = configRepository.getRuntimeConfig();
-        let budget: number;
-        let cost: UsageCost;
-
-        if (guildId) {
-            const guildBudget = guildBudgetRepository.getBudget(guildId);
-            budget = guildBudget?.dailyBudgetUsd ?? (runtimeConfig.dailyBudgetUsd || 0);
-            cost = this.getGuildCost(guildId, runtimeConfig);
-        } else {
-            budget = runtimeConfig.dailyBudgetUsd || 0;
-            cost = this.getCost(runtimeConfig);
-        }
+        const { budget, cost } = this.getBudgetScope(guildId, runtimeConfig);
 
         if (budget <= 0) return false;
         return cost.totalCost >= budget;
@@ -130,17 +120,7 @@ class UsageTracker {
         guildId?: string | null;
     }): boolean {
         const runtimeConfig = configRepository.getRuntimeConfig();
-        let budget: number;
-        let cost: UsageCost;
-
-        if (guildId) {
-            const guildBudget = guildBudgetRepository.getBudget(guildId);
-            budget = guildBudget?.dailyBudgetUsd ?? (runtimeConfig.dailyBudgetUsd || 0);
-            cost = this.getGuildCost(guildId, runtimeConfig);
-        } else {
-            budget = runtimeConfig.dailyBudgetUsd || 0;
-            cost = this.getCost(runtimeConfig);
-        }
+        const { budget, cost } = this.getBudgetScope(guildId, runtimeConfig);
 
         if (budget <= 0) return false;
 
@@ -151,10 +131,30 @@ class UsageTracker {
         return cost.totalCost + estimatedCost >= budget;
     }
 
+    private getBudgetScope(
+        guildId: string | null | undefined,
+        runtimeConfig: RuntimeConfig,
+    ): { budget: number; cost: UsageCost } {
+        if (guildId) {
+            const guildBudget = guildBudgetRepository.getBudget(guildId);
+            if (guildBudget) {
+                return {
+                    budget: guildBudget.dailyBudgetUsd,
+                    cost: this.getGuildCost(guildId, runtimeConfig),
+                };
+            }
+        }
+
+        return {
+            budget: runtimeConfig.dailyBudgetUsd || 0,
+            cost: this.getSharedGlobalBudgetCost(runtimeConfig),
+        };
+    }
+
     /** Get stats for dashboard display (global). */
     getStats(): UsageStats {
         const runtimeConfig = configRepository.getRuntimeConfig();
-        const cost = this.getCost(runtimeConfig);
+        const cost = this.getSharedGlobalBudgetCost(runtimeConfig);
         const budget = runtimeConfig.dailyBudgetUsd || 0;
 
         return toUsageStats(cost, budget);
@@ -222,6 +222,37 @@ class UsageTracker {
             totalTokens: day.inputTokens + day.outputTokens,
             cost: calculateCost(day, runtimeConfig),
         }));
+    }
+
+    private getSharedGlobalBudgetCost(runtimeConfig: RuntimeConfig): UsageCost {
+        this.ensureToday();
+        const todayValue = today();
+        const totalUsage = usageRepository.getDailyUsage();
+        const sharedUsage =
+            totalUsage?.date === todayValue ? { ...totalUsage } : createEmptyUsage(todayValue);
+        const guildUsage = usageRepository.getAllGuildDailyUsage();
+        const customBudgets = guildBudgetRepository.listBudgets();
+
+        for (const guildId of Object.keys(customBudgets)) {
+            const customUsage = guildUsage[guildId];
+            if (customUsage?.date !== todayValue) {
+                continue;
+            }
+
+            sharedUsage.inputTokens -= customUsage.inputTokens;
+            sharedUsage.outputTokens -= customUsage.outputTokens;
+            sharedUsage.requests -= customUsage.requests;
+        }
+
+        sharedUsage.inputTokens = Math.max(sharedUsage.inputTokens, 0);
+        sharedUsage.outputTokens = Math.max(sharedUsage.outputTokens, 0);
+        sharedUsage.requests = Math.max(sharedUsage.requests, 0);
+
+        return withCost(
+            sharedUsage,
+            runtimeConfig.inputPricePerMillion || 0,
+            runtimeConfig.outputPricePerMillion || 0,
+        );
     }
 }
 
