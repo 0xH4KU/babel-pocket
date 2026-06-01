@@ -18,6 +18,7 @@ Server owners keep control of hosting, API keys, access rules, and token costs i
 
 [Live Dashboard Demo](https://0xh4ku.github.io/babel-discord-translator/demo/) ·
 [Deployment Guide](docs/operations/deployment.md) ·
+[Railway](docs/operations/railway.md) ·
 [Docker Ops](docs/operations/docker.md) ·
 [Support on Ko-fi](https://ko-fi.com/0xh4ku)
 
@@ -142,7 +143,7 @@ docker compose up -d --build
 Open `http://localhost:3000` → Login → Complete the setup wizard.
 On first boot, Babel creates `data/babel.sqlite` and auto-imports `data/config.json` if a legacy JSON store exists.
 
-For Railway, Docker, VPS, PM2, and static dashboard demo notes, see the [deployment guide](docs/operations/deployment.md). For copy-paste Docker operations, updates, cleanup, and server migration, see [Docker deployment and operations](docs/operations/docker.md).
+For Railway, Docker, VPS, PM2, and static dashboard demo notes, see the [deployment guide](docs/operations/deployment.md). For one-click Railway template publishing notes, see [Railway deployment](docs/operations/railway.md). For copy-paste Docker operations, updates, cleanup, and server migration, see [Docker deployment and operations](docs/operations/docker.md).
 
 ---
 
@@ -210,7 +211,9 @@ All configuration is managed through the web dashboard. The `.env` file only nee
 | Variable | Description | Default |
 |---|---|---|
 | `DISCORD_TOKEN` | Discord bot token | *required* |
+| `PORT` | Platform-provided dashboard web server port; takes precedence over `DASHBOARD_PORT` | unset |
 | `DASHBOARD_PORT` | Dashboard web server port | `3000` |
+| `DASHBOARD_HOST` | Dashboard bind host | `0.0.0.0` |
 | `DASHBOARD_PASSWORD` | Dashboard login password | `admin` (development only; refused in production) |
 | `BABEL_DB_PATH` | SQLite database path | `data/babel.sqlite` |
 
@@ -410,6 +413,21 @@ This compares `configRepository.getRuntimeConfig()` against `store.getAll()` ove
 ---
 
 ## Production Deployment
+
+### Railway
+
+Babel is Railway-ready for a one-click self-host template: `railway.json` configures the `/livez` healthcheck, Railway's `PORT` is respected automatically, and `/app/data` can be mounted as a volume for SQLite.
+
+Use these template variables:
+
+| Variable | Value |
+|---|---|
+| `DISCORD_TOKEN` | Your Discord bot token |
+| `DASHBOARD_PASSWORD` | A strong random password |
+| `BABEL_DB_PATH` | `/app/data/babel.sqlite` |
+| `NODE_ENV` | `production` |
+
+Mount a Railway volume at `/app/data`, generate a public domain, then log in and finish provider setup from the dashboard. See [Railway deployment](docs/operations/railway.md) for the template publishing checklist and transparent kickback disclosure wording.
 
 ### PM2
 

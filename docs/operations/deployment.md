@@ -36,7 +36,7 @@ This registers the `Babel` message context menu plus `/translate`, `/setlang`, `
 
 ## Railway
 
-Railway is a good fit for small communities that want a hosted deployment without managing a VPS.
+Railway is a good fit for small communities that want a hosted self-deploy without managing a VPS. Babel supports Railway's `PORT` variable, binds the dashboard on `0.0.0.0` by default, and includes `railway.json` for the `/livez` healthcheck.
 
 Recommended environment variables:
 
@@ -44,19 +44,21 @@ Recommended environment variables:
 | -------------------- | ------------------------ |
 | `DISCORD_TOKEN`      | Your Discord bot token   |
 | `DASHBOARD_PASSWORD` | A strong random password |
-| `DASHBOARD_PORT`     | `3000`                   |
 | `BABEL_DB_PATH`      | `/app/data/babel.sqlite` |
 | `NODE_ENV`           | `production`             |
 
-Use a persistent volume mounted at `/app/data` so SQLite survives restarts and redeploys.
+Use a persistent volume mounted at `/app/data` so SQLite survives restarts and redeploys. If the Railway volume is not writable by the Docker image's non-root user, set `RAILWAY_RUN_UID=0` on the service.
 
 After deployment:
 
-1. Open the Railway public URL.
-2. Log in with `DASHBOARD_PASSWORD`.
-3. Complete the setup wizard.
-4. Register Discord commands from a local checkout or Railway shell with `npm run register`.
-5. Check `/readyz` and the dashboard Operations panel.
+1. Generate a Railway public domain.
+2. Open the Railway public URL.
+3. Log in with `DASHBOARD_PASSWORD`.
+4. Complete the setup wizard and configure the provider.
+5. Register Discord commands from a local checkout or Railway shell with `npm run register`.
+6. Check `/livez`, `/readyz`, and the dashboard Operations panel.
+
+For the one-click template checklist, persistent volume notes, and affiliate disclosure wording, see [Railway deployment](railway.md).
 
 ## Docker / VPS
 
@@ -77,6 +79,7 @@ Example `.env`:
 ```env
 DISCORD_TOKEN=your_bot_token_here
 DASHBOARD_PORT=3000
+DASHBOARD_HOST=0.0.0.0
 DASHBOARD_PASSWORD=replace_with_a_strong_password
 BABEL_DB_PATH=/app/data/babel.sqlite
 NODE_ENV=production

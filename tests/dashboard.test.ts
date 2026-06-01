@@ -419,6 +419,17 @@ describe('Dashboard API', () => {
         expect(health.body!.strategy).toBeDefined();
     });
 
+    it('should bind the dashboard server to the configured host', () => {
+        const appListen = vi.fn();
+        const appForHost = {
+            listen: appListen,
+        } as unknown as ReturnType<typeof createDashboardApp>;
+
+        startDashboardServer(appForHost, 3000, '0.0.0.0');
+
+        expect(appListen).toHaveBeenCalledWith(3000, '0.0.0.0', expect.any(Function));
+    });
+
     it('should report degraded health when Vertex AI readiness fails', async () => {
         healthCheck.mockResolvedValue({ healthy: false, error: 'upstream unavailable' });
 

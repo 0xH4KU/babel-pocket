@@ -15,6 +15,8 @@ export interface AppConfig {
     discordToken: string;
     /** Port for the web dashboard server. */
     dashboardPort: number;
+    /** Host interface for the web dashboard server. */
+    dashboardHost: string;
     /** Password for dashboard login. */
     dashboardPassword: string;
 }
@@ -53,19 +55,21 @@ export function validateEnv(
         );
     }
 
-    const rawPort = env.DASHBOARD_PORT ?? String(DEFAULT_DASHBOARD_PORT);
+    const rawPort = env.PORT ?? env.DASHBOARD_PORT ?? String(DEFAULT_DASHBOARD_PORT);
     const port = Number.parseInt(rawPort, 10);
     if (isNaN(port) || port < 1 || port > 65535) {
+        const portField = env.PORT ? 'PORT' : 'DASHBOARD_PORT';
         configLogger.error('config.validation.failed', {
-            field: 'DASHBOARD_PORT',
+            field: portField,
             error: 'Invalid dashboard port',
             value: rawPort,
             hint: 'Use a number between 1 and 65535',
         });
         throw new Error(
-            `Invalid DASHBOARD_PORT: ${rawPort}. ` + 'Must be a number between 1 and 65535.',
+            `Invalid ${portField}: ${rawPort}. ` + 'Must be a number between 1 and 65535.',
         );
     }
+    const dashboardHost = env.DASHBOARD_HOST || '0.0.0.0';
 
     const password = env.DASHBOARD_PASSWORD || DEFAULT_DASHBOARD_PASSWORD;
     if (password === DEFAULT_DASHBOARD_PASSWORD) {
@@ -89,7 +93,7 @@ export function validateEnv(
         });
     }
 
-    return { discordToken: token, dashboardPort: port, dashboardPassword: password };
+    return { discordToken: token, dashboardPort: port, dashboardHost, dashboardPassword: password };
 }
 
 export function loadConfig(

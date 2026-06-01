@@ -553,7 +553,10 @@ function sanitizeGlossaryInput(body: Record<string, unknown>):
         return { ok: false, error: 'Glossary source and target are required' };
     }
 
-    if (sourceText.length > MAX_GLOSSARY_TEXT_LENGTH || targetText.length > MAX_GLOSSARY_TEXT_LENGTH) {
+    if (
+        sourceText.length > MAX_GLOSSARY_TEXT_LENGTH ||
+        targetText.length > MAX_GLOSSARY_TEXT_LENGTH
+    ) {
         return {
             ok: false,
             error: `Glossary source and target must be ${MAX_GLOSSARY_TEXT_LENGTH} characters or fewer`,
@@ -745,8 +748,8 @@ export function createDashboardApp({
             const guildStats = guildStatsById[guild.id];
             const scopedStats = hasCustom ? guildStats : usageStats;
             const budget = hasCustom
-                ? guildCfg?.dailyBudgetUsd ?? 0
-                : scopedStats?.dailyBudget ?? usageStats.dailyBudget;
+                ? (guildCfg?.dailyBudgetUsd ?? 0)
+                : (scopedStats?.dailyBudget ?? usageStats.dailyBudget);
             const totalCost = scopedStats?.totalCost ?? 0;
             const requests = scopedStats?.requests ?? 0;
             return {
@@ -975,7 +978,9 @@ export function createDashboardApp({
             const entryId = Number.parseInt(String(req.params.entryId ?? ''), 10);
 
             if (!guildId || !Number.isInteger(entryId) || entryId < 1) {
-                res.status(400).json({ error: 'Valid guild id and glossary entry id are required' });
+                res.status(400).json({
+                    error: 'Valid guild id and glossary entry id are required',
+                });
                 return;
             }
 
@@ -1123,13 +1128,19 @@ export function createDashboardApp({
     return app;
 }
 
-export function startDashboardServer(app: express.Express, port: number): http.Server {
+export function startDashboardServer(
+    app: express.Express,
+    port: number,
+    host?: string,
+): http.Server {
     const logger = appLogger.child({ component: 'dashboard' });
-    const server = app.listen(port, () => {
+    const onListening = () => {
         const address = server.address();
         const actualPort = typeof address === 'object' && address ? address.port : port;
-        logger.info('dashboard.server.started', { port: actualPort });
-    });
+        const actualHost = typeof address === 'object' && address ? address.address : host;
+        logger.info('dashboard.server.started', { port: actualPort, host: actualHost });
+    };
+    const server = host ? app.listen(port, host, onListening) : app.listen(port, onListening);
 
     return server;
 }

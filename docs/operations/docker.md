@@ -41,6 +41,7 @@ Set at least:
 DISCORD_TOKEN=your_bot_token_here
 DASHBOARD_PASSWORD=replace_with_a_strong_password
 DASHBOARD_PORT=3000
+DASHBOARD_HOST=0.0.0.0
 BABEL_DB_PATH=/app/data/babel.sqlite
 NODE_ENV=production
 ```

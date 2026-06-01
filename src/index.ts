@@ -99,7 +99,11 @@ client.once(Events.ClientReady, (c) => {
         metrics,
         runtimeLimiter,
     });
-    dashboardServer = startDashboardServer(dashboardApp, config.dashboardPort);
+    dashboardServer = startDashboardServer(
+        dashboardApp,
+        config.dashboardPort,
+        config.dashboardHost,
+    );
 });
 
 client.on(Events.InteractionCreate, async (interaction) => {

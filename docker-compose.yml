@@ -9,6 +9,7 @@ services:
     environment:
       NODE_ENV: production
       DASHBOARD_PORT: 3000
+      DASHBOARD_HOST: 0.0.0.0
       BABEL_DB_PATH: /app/data/babel.sqlite
     ports:
       - "3000:3000"
