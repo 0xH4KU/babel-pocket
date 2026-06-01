@@ -16,8 +16,9 @@ Server owners keep control of hosting, API keys, access rules, and token costs i
 [![Version](https://img.shields.io/badge/version-0.1.2-brightgreen.svg)](package.json)
 [![CI](https://github.com/0xH4KU/babel-discord-translator/actions/workflows/ci.yml/badge.svg)](https://github.com/0xH4KU/babel-discord-translator/actions)
 
-[![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/deploy/LmHFbD?referralCode=euhy-o&utm_medium=integration&utm_source=template&utm_campaign=generic)
-[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/P5P51QB1B7)
+[![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/deploy/babel-discord-tran-1?referralCode=euhy-o&utm_medium=integration&utm_source=template&utm_campaign=generic)
+
+[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/0xh4ku)
 
 [Live Dashboard Demo](https://0xh4ku.github.io/babel-discord-translator/demo/) ·
 [Deployment Guide](docs/operations/deployment.md) ·

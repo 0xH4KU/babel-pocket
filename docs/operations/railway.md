@@ -13,7 +13,7 @@ The repository is Railway-ready:
 - Babel binds the dashboard to `DASHBOARD_HOST`, which defaults to `0.0.0.0`.
 - The Docker image stores SQLite data under `/app/data` when `BABEL_DB_PATH=/app/data/babel.sqlite`.
 
-[![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/deploy/LmHFbD?referralCode=euhy-o&utm_medium=integration&utm_source=template&utm_campaign=generic)
+[![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/deploy/babel-discord-tran-1?referralCode=euhy-o&utm_medium=integration&utm_source=template&utm_campaign=generic)
 
 ## Required Variables
 

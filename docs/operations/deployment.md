@@ -143,4 +143,4 @@ In the dashboard, check:
 
 Babel is free and self-hosted. If it saves setup time or helps your community avoid a hosted bot subscription, you can support upstream maintenance on Ko-fi:
 
-https://ko-fi.com/P5P51QB1B7
+[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/0xh4ku)
