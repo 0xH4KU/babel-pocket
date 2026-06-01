@@ -18,6 +18,7 @@ Server owners keep control of hosting, API keys, access rules, and token costs i
 
 [Live Dashboard Demo](https://0xh4ku.github.io/babel-discord-translator/demo/) ·
 [Deployment Guide](docs/operations/deployment.md) ·
+[Docker Ops](docs/operations/docker.md) ·
 [Support on Ko-fi](https://ko-fi.com/0xh4ku)
 
 </div>
@@ -26,11 +27,12 @@ Server owners keep control of hosting, API keys, access rules, and token costs i
 
 ## Why Babel
 
-Babel is for Discord communities that want translation without handing control to a paid shared bot. You deploy your own instance, use your own AI provider key, and manage cost from the dashboard.
+Babel is for Discord communities that want translation without handing control to a paid shared bot. Many Discord translation bots charge a subscription for workflows your own AI provider key can already power. Babel keeps that workflow self-hosted: you deploy your own instance, use your own provider key, and pay only your provider usage.
 
 - **Self-hosted** — your Discord token, provider keys, SQLite data, and logs stay in your deployment
 - **No privileged intents** — Babel uses context menu and slash commands, not full message-content access
 - **Cost controls** — daily budgets, per-server budget overrides, cache hit tracking, and usage history
+- **Server glossaries** — each server can define its own term mappings for names, brands, game terms, and community vocabulary
 - **Operations ready** — health endpoints, Prometheus metrics, runtime queue limits, provider fallback diagnostics, and backup docs
 
 Try the [read-only dashboard demo](https://0xh4ku.github.io/babel-discord-translator/demo/) with mock data before deploying.
@@ -38,6 +40,8 @@ Try the [read-only dashboard demo](https://0xh4ku.github.io/babel-discord-transl
 ## Support
 
 Babel is free and self-hosted. If it saves you setup time or helps your community avoid a hosted bot subscription, you can support upstream maintenance on [Ko-fi](https://ko-fi.com/0xh4ku).
+
+Sponsorship is optional and does not unlock private features. If Babel helps your server avoid a paid translation-bot subscription, supporting maintenance helps fund docs, fixes, deployment templates, and provider updates for everyone.
 
 ## Features
 
@@ -49,6 +53,7 @@ Babel is free and self-hosted. If it saves you setup time or helps your communit
 - **Multi-language Support** — Auto-detects your Discord locale, or use `/setlang` to choose
 - **Same-Language Detection** — Skips translation when text is already in the user's language
 - **Custom Prompt** — Fully customizable translation system prompt from the dashboard
+- **Server Glossary** — Per-server term mappings injected into translation prompts, with cache invalidation when terms change
 
 ### Performance & Reliability
 
@@ -128,10 +133,16 @@ npm run build
 npm start
 ```
 
+Or run with Docker Compose:
+
+```bash
+docker compose up -d --build
+```
+
 Open `http://localhost:3000` → Login → Complete the setup wizard.
 On first boot, Babel creates `data/babel.sqlite` and auto-imports `data/config.json` if a legacy JSON store exists.
 
-For Railway, Docker, VPS, PM2, and static dashboard demo notes, see the [deployment guide](docs/operations/deployment.md).
+For Railway, Docker, VPS, PM2, and static dashboard demo notes, see the [deployment guide](docs/operations/deployment.md). For copy-paste Docker operations, updates, cleanup, and server migration, see [Docker deployment and operations](docs/operations/docker.md).
 
 ---
 
@@ -170,6 +181,7 @@ After starting the bot, open `http://localhost:3000`:
 | **Config** | Cooldown, cache size, max input length, max output tokens, custom prompt |
 | **Pricing** | Per-million-token prices, global daily budget (0 = unlimited) |
 | **Access** | Server whitelist, per-server budget overrides |
+| **Glossary** | Per-server source → target term mappings |
 | **Users** | View and manage per-user language preferences |
 | **Monitor** | API health, cache hit rate, failure rate, API call volume, translation test |
 
@@ -266,6 +278,7 @@ Use `npm run db:migrate -- --force` to overwrite an existing SQLite file.
 | State | Storage | Survives Restart? |
 |---|---|---|
 | Config, usage, preferences, guild budgets, sessions | SQLite | ✅ |
+| Server glossaries | SQLite | ✅ |
 | Translation cache, cooldowns, runtime limiter queues | In-memory | ❌ |
 | Audit logs, metrics snapshots, webhook channel cache | In-memory | ❌ |
 

@@ -12,6 +12,7 @@ RUN npm run build
 FROM node:22-alpine
 WORKDIR /app
 
+RUN apk add --no-cache sqlite
 RUN addgroup -S babel && adduser -S babel -G babel
 
 COPY --from=build /app/dist ./dist

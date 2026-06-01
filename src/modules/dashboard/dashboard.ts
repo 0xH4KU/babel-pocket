@@ -21,6 +21,7 @@ import { checkOpenAiHealth } from '../../infra/openai-client.js';
 import { configRepository } from '../config/config-repository.js';
 import { guildBudgetRepository } from '../usage/guild-budget-repository.js';
 import { userPreferenceRepository } from '../translation/user-preference-repository.js';
+import { guildGlossaryRepository } from '../translation/guild-glossary-repository.js';
 import { applyConfigUpdateEffects } from '../config/config-runtime-effects.js';
 import { appLogger } from '../../shared/structured-logger.js';
 import { dashboardMessages } from '../../shared/messages/dashboard-messages.js';
@@ -33,6 +34,8 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const MAX_CACHE_SIZE = 2000;
 const BYTES_PER_MB = 1024 * 1024;
 const BUDGET_WARNING_THRESHOLD = 0.8;
+const MAX_GLOSSARY_TEXT_LENGTH = 120;
+const MAX_GLOSSARY_NOTES_LENGTH = 200;
 const EMPTY_PROVIDER_METRICS: ProviderMetricsSnapshot = {
     successTotal: 0,
     failureTotal: 0,
@@ -526,6 +529,59 @@ function validateConfigUpdate(updates: Record<string, unknown>): {
     return { valid: true, sanitized: sanitized as Partial<StoreData> };
 }
 
+function sanitizeGlossaryInput(body: Record<string, unknown>):
+    | {
+          ok: true;
+          value: {
+              id?: number;
+              sourceText: string;
+              targetText: string;
+              notes: string;
+          };
+      }
+    | { ok: false; error: string } {
+    const sourceText = String(body.sourceText ?? '').trim();
+    const targetText = String(body.targetText ?? '').trim();
+    const notes = String(body.notes ?? '').trim();
+    const rawId = body.id;
+    const id =
+        rawId === undefined || rawId === null || rawId === ''
+            ? undefined
+            : Number.parseInt(String(rawId), 10);
+
+    if (!sourceText || !targetText) {
+        return { ok: false, error: 'Glossary source and target are required' };
+    }
+
+    if (sourceText.length > MAX_GLOSSARY_TEXT_LENGTH || targetText.length > MAX_GLOSSARY_TEXT_LENGTH) {
+        return {
+            ok: false,
+            error: `Glossary source and target must be ${MAX_GLOSSARY_TEXT_LENGTH} characters or fewer`,
+        };
+    }
+
+    if (notes.length > MAX_GLOSSARY_NOTES_LENGTH) {
+        return {
+            ok: false,
+            error: `Glossary notes must be ${MAX_GLOSSARY_NOTES_LENGTH} characters or fewer`,
+        };
+    }
+
+    if (id !== undefined && (!Number.isInteger(id) || id < 1)) {
+        return { ok: false, error: 'Glossary entry id must be a positive integer' };
+    }
+
+    return {
+        ok: true,
+        value: {
+            ...(id !== undefined ? { id } : {}),
+            sourceText,
+            targetText,
+            notes,
+        },
+    };
+}
+
 export function createDashboardApp({
     cache,
     cooldown,
@@ -869,6 +925,67 @@ export function createDashboardApp({
 
             guildBudgetRepository.setBudget(guildId, v);
             res.json({ ok: true, budget: v });
+        },
+    );
+
+    app.get('/api/guild-glossary/:guildId', auth.requireAuth, (req: Request, res: Response) => {
+        const guildId = String(req.params.guildId ?? '').trim();
+        if (!guildId) {
+            res.status(400).json({ error: 'Guild id is required' });
+            return;
+        }
+
+        const entries = guildGlossaryRepository.listEntries(guildId);
+        res.json({ entries, count: entries.length });
+    });
+
+    app.post(
+        '/api/guild-glossary/:guildId',
+        auth.requireAuth,
+        auth.requireCsrf,
+        (req: Request, res: Response) => {
+            const guildId = String(req.params.guildId ?? '').trim();
+            if (!guildId) {
+                res.status(400).json({ error: 'Guild id is required' });
+                return;
+            }
+
+            const input = sanitizeGlossaryInput(req.body ?? {});
+            if (!input.ok) {
+                res.status(400).json({ error: input.error });
+                return;
+            }
+
+            try {
+                const entry = guildGlossaryRepository.upsertEntry(guildId, input.value);
+                cache.clear();
+                res.json({ ok: true, entry, cacheCleared: true });
+            } catch (error) {
+                res.status(404).json({ error: (error as Error).message });
+            }
+        },
+    );
+
+    app.delete(
+        '/api/guild-glossary/:guildId/:entryId',
+        auth.requireAuth,
+        auth.requireCsrf,
+        (req: Request, res: Response) => {
+            const guildId = String(req.params.guildId ?? '').trim();
+            const entryId = Number.parseInt(String(req.params.entryId ?? ''), 10);
+
+            if (!guildId || !Number.isInteger(entryId) || entryId < 1) {
+                res.status(400).json({ error: 'Valid guild id and glossary entry id are required' });
+                return;
+            }
+
+            if (!guildGlossaryRepository.deleteEntry(guildId, entryId)) {
+                res.status(404).json({ error: 'Glossary entry not found' });
+                return;
+            }
+
+            cache.clear();
+            res.json({ ok: true, deleted: entryId });
         },
     );
 

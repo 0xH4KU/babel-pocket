@@ -12,6 +12,10 @@
     '/usage/history': 'history.json',
     '/logs': 'logs.json',
     '/user-prefs': 'user-prefs.json',
+    '/guild-glossary/100000000000000001': 'guild-glossary.json',
+    '/guild-glossary/100000000000000002': { entries: [], count: 0 },
+    '/guild-glossary/100000000000000003': { entries: [], count: 0 },
+    '/guild-glossary/100000000000000004': { entries: [], count: 0 },
     '/sessions': 'sessions.json'
   };
 

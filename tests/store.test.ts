@@ -145,6 +145,63 @@ describe('ConfigStore', () => {
         store.close();
     });
 
+    it('should support per-guild glossary operations', async () => {
+        const { ConfigStore } = await importStoreModule();
+        const store = new ConfigStore({ dbPath, autoImportLegacyJson: false });
+
+        expect(store.listGuildGlossary('guild-1')).toEqual([]);
+
+        const first = store.upsertGuildGlossaryEntry('guild-1', {
+            sourceText: 'OpenAI',
+            targetText: 'OpenAI',
+            notes: 'Preserve brand name',
+        });
+        const second = store.upsertGuildGlossaryEntry('guild-1', {
+            sourceText: 'raid',
+            targetText: '副本',
+        });
+
+        expect(store.listGuildGlossary('guild-1')).toEqual([
+            {
+                id: first.id,
+                guildId: 'guild-1',
+                sourceText: 'OpenAI',
+                targetText: 'OpenAI',
+                notes: 'Preserve brand name',
+                createdAt: expect.any(String),
+                updatedAt: expect.any(String),
+            },
+            {
+                id: second.id,
+                guildId: 'guild-1',
+                sourceText: 'raid',
+                targetText: '副本',
+                notes: '',
+                createdAt: expect.any(String),
+                updatedAt: expect.any(String),
+            },
+        ]);
+
+        const updated = store.upsertGuildGlossaryEntry('guild-1', {
+            id: second.id,
+            sourceText: 'raid',
+            targetText: '團本',
+            notes: 'Game term',
+        });
+
+        expect(updated.id).toBe(second.id);
+        expect(store.listGuildGlossary('guild-1').map((entry) => entry.targetText)).toEqual([
+            'OpenAI',
+            '團本',
+        ]);
+        expect(store.listGuildGlossary('guild-2')).toEqual([]);
+        expect(store.deleteGuildGlossaryEntry('guild-1', first.id)).toBe(true);
+        expect(store.deleteGuildGlossaryEntry('guild-1', first.id)).toBe(false);
+        expect(store.listGuildGlossary('guild-1')).toHaveLength(1);
+
+        store.close();
+    });
+
     it('should support direct guild usage operations', async () => {
         const { ConfigStore } = await importStoreModule();
         const store = new ConfigStore({ dbPath, autoImportLegacyJson: false });

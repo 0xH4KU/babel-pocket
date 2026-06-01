@@ -89,6 +89,8 @@ curl -fsS http://localhost:3000/livez
 curl -fsS http://localhost:3000/readyz
 ```
 
+For Docker Compose, update, cleanup, backup, and server migration commands, see [Docker deployment and operations](docker.md).
+
 ## PM2
 
 For a direct Node.js install:

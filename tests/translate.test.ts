@@ -2,7 +2,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { translate, _test } from '../src/translate.js';
 import { fetchWithRetry } from '../src/infra/vertex-ai-client.js';
 
-const { getLanguageName, buildTargetedPrompt, LOCALE_MAP, DEFAULT_PROMPT } = _test;
+const { getLanguageName, buildTargetedPrompt, LOCALE_MAP, DEFAULT_PROMPT, buildGlossaryPromptSection } =
+    _test;
 
 // --- Mock store ---
 vi.mock('../src/store.js', () => {
@@ -100,6 +101,23 @@ describe('buildTargetedPrompt', () => {
         const prompt = buildTargetedPrompt('ko');
         expect(prompt).toContain('already in');
         expect(prompt).toContain('English instead');
+    });
+});
+
+describe('buildGlossaryPromptSection', () => {
+    it('should render glossary rules with notes', () => {
+        const section = buildGlossaryPromptSection([
+            { sourceText: 'OpenAI', targetText: 'OpenAI', notes: 'Preserve brand name' },
+            { sourceText: 'raid', targetText: '團本', notes: '' },
+        ]);
+
+        expect(section).toContain('Server glossary');
+        expect(section).toContain('- OpenAI => OpenAI (Preserve brand name)');
+        expect(section).toContain('- raid => 團本');
+    });
+
+    it('should omit the glossary section when there are no entries', () => {
+        expect(buildGlossaryPromptSection([])).toBe('');
     });
 });
 
@@ -264,6 +282,26 @@ describe('translate', () => {
             (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0][1].body,
         );
         expect(body.contents[0].parts[0].text).toContain('Custom: translate to Pirate English');
+    });
+
+    it('should append glossary entries to provider prompts', async () => {
+        globalThis.fetch = vi.fn().mockResolvedValue(geminiResponse('團本'));
+
+        await translate('raid tonight', 'zh-TW', {
+            glossaryEntries: [
+                {
+                    sourceText: 'raid',
+                    targetText: '團本',
+                    notes: 'Game term',
+                },
+            ],
+        });
+
+        const body = JSON.parse(
+            (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0][1].body,
+        );
+        expect(body.contents[0].parts[0].text).toContain('Server glossary');
+        expect(body.contents[0].parts[0].text).toContain('- raid => 團本 (Game term)');
     });
 
     it('should use targeted prompt for specific language', async () => {

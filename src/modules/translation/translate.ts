@@ -10,6 +10,12 @@ import type { AppMetricsCollector } from '../../shared/app-metrics.js';
 import type { TranslationResult } from '../../types.js';
 import type { TranslationProvider } from '../../infra/provider-orchestrator.js';
 
+export interface TranslationGlossaryPromptEntry {
+    sourceText: string;
+    targetText: string;
+    notes?: string;
+}
+
 /** Map Discord locale code to a human-readable language name for the prompt. */
 const LOCALE_MAP: Record<string, string> = {
     'zh-TW': 'Traditional Chinese (繁體中文)',
@@ -84,11 +90,39 @@ export function buildTranslationPrompt(
     text: string,
     targetLanguage: string = 'auto',
     customPrompt?: string | null,
+    glossaryEntries: TranslationGlossaryPromptEntry[] = [],
 ): string {
-    return `${resolveSystemPrompt(targetLanguage, customPrompt)}
+    return `${resolveSystemPrompt(targetLanguage, customPrompt)}${buildGlossaryPromptSection(glossaryEntries)}
 
 Text:
 ${text}`;
+}
+
+export function buildGlossaryPromptSection(entries: TranslationGlossaryPromptEntry[]): string {
+    const usableEntries = entries
+        .map((entry) => ({
+            sourceText: entry.sourceText.trim(),
+            targetText: entry.targetText.trim(),
+            notes: entry.notes?.trim() ?? '',
+        }))
+        .filter((entry) => entry.sourceText && entry.targetText);
+
+    if (usableEntries.length === 0) {
+        return '';
+    }
+
+    const rules = usableEntries
+        .map((entry) => {
+            const notes = entry.notes ? ` (${entry.notes})` : '';
+            return `- ${entry.sourceText} => ${entry.targetText}${notes}`;
+        })
+        .join('\n');
+
+    return `
+
+Server glossary:
+Use these server-specific term mappings when they appear in the source text. If source and target are identical, preserve the term exactly.
+${rules}`;
 }
 
 /**
@@ -117,11 +151,17 @@ export async function translate(
     options?: {
         logContext?: Pick<StructuredLogFields, 'requestId' | 'guildId' | 'userId' | 'command'>;
         metrics?: AppMetricsCollector;
+        glossaryEntries?: TranslationGlossaryPromptEntry[];
     },
 ): Promise<TranslationResult> {
     const config = configRepository.getRuntimeConfig();
     const customPrompt = config.translationPrompt;
-    const prompt = buildTranslationPrompt(text, targetLanguage, customPrompt);
+    const prompt = buildTranslationPrompt(
+        text,
+        targetLanguage,
+        customPrompt,
+        options?.glossaryEntries,
+    );
     const maxOutputTokens = config.maxOutputTokens || 1000;
     const mode = config.translationProvider || 'vertex';
 
@@ -137,6 +177,7 @@ export const _test = {
     LOCALE_MAP,
     DEFAULT_PROMPT,
     resolveSystemPrompt,
+    buildGlossaryPromptSection,
     buildTranslationPrompt,
     /** Reset providers for testing. */
     resetProviders(): void {

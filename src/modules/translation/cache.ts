@@ -8,6 +8,7 @@ export interface TranslationCacheKeyInput {
     geminiModel: string;
     prompt: string;
     maxOutputTokens: number;
+    glossaryVersion?: string;
 }
 
 function hashCachePart(value: string): string {
@@ -20,6 +21,7 @@ export function buildTranslationCacheKey({
     geminiModel,
     prompt,
     maxOutputTokens,
+    glossaryVersion = '',
 }: TranslationCacheKeyInput): string {
     return [
         'translation',
@@ -29,6 +31,7 @@ export function buildTranslationCacheKey({
         geminiModel,
         maxOutputTokens,
         hashCachePart(prompt),
+        hashCachePart(glossaryVersion),
     ].join(':');
 }
 

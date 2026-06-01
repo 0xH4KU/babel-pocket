@@ -45,6 +45,19 @@ vi.mock('../src/store.js', () => {
         guildTokenUsage: {},
         guildUsageHistory: {},
     };
+    const glossary: Record<
+        string,
+        Array<{
+            id: number;
+            guildId: string;
+            sourceText: string;
+            targetText: string;
+            notes: string;
+            createdAt: string;
+            updatedAt: string;
+        }>
+    > = {};
+    let glossaryId = 1;
     return {
         store: {
             get: vi.fn((key: string) => data[key]),
@@ -74,6 +87,49 @@ vi.mock('../src/store.js', () => {
                 if (!(guildId in budgets)) return false;
                 delete budgets[guildId];
                 return true;
+            }),
+            listGuildGlossary: vi.fn((guildId: string) => glossary[guildId] ?? []),
+            upsertGuildGlossaryEntry: vi.fn(
+                (
+                    guildId: string,
+                    input: {
+                        id?: number;
+                        sourceText: string;
+                        targetText: string;
+                        notes?: string;
+                    },
+                ) => {
+                    const now = '2026-06-01T00:00:00.000Z';
+                    glossary[guildId] ??= [];
+
+                    if (input.id !== undefined) {
+                        const existing = glossary[guildId].find((entry) => entry.id === input.id);
+                        if (!existing) throw new Error('Glossary entry not found');
+                        existing.sourceText = input.sourceText.trim();
+                        existing.targetText = input.targetText.trim();
+                        existing.notes = input.notes?.trim() ?? '';
+                        existing.updatedAt = now;
+                        return { ...existing };
+                    }
+
+                    const entry = {
+                        id: glossaryId++,
+                        guildId,
+                        sourceText: input.sourceText.trim(),
+                        targetText: input.targetText.trim(),
+                        notes: input.notes?.trim() ?? '',
+                        createdAt: now,
+                        updatedAt: now,
+                    };
+                    glossary[guildId].push(entry);
+                    return { ...entry };
+                },
+            ),
+            deleteGuildGlossaryEntry: vi.fn((guildId: string, entryId: number) => {
+                const entries = glossary[guildId] ?? [];
+                const before = entries.length;
+                glossary[guildId] = entries.filter((entry) => entry.id !== entryId);
+                return glossary[guildId].length < before;
             }),
             isSetupComplete: vi.fn(() => data.setupComplete),
         },
@@ -1082,6 +1138,79 @@ describe('Dashboard API', () => {
             cookie: sessionCookie,
         });
         expect((prefsRes.body!.prefs as Record<string, string>).user1).toBeUndefined();
+    });
+
+    it('should manage per-guild glossary entries', async () => {
+        const create = await request(server, 'POST', '/api/guild-glossary/guild-1', {
+            cookie: sessionCookie,
+            csrf: csrfToken,
+            body: {
+                sourceText: 'raid',
+                targetText: '團本',
+                notes: 'Game term',
+            },
+        });
+
+        expect(create.status).toBe(200);
+        expect(create.body).toMatchObject({
+            ok: true,
+            entry: {
+                id: expect.any(Number),
+                guildId: 'guild-1',
+                sourceText: 'raid',
+                targetText: '團本',
+                notes: 'Game term',
+            },
+        });
+
+        const list = await request(server, 'GET', '/api/guild-glossary/guild-1', {
+            cookie: sessionCookie,
+        });
+        expect(list.status).toBe(200);
+        expect(list.body).toMatchObject({
+            entries: [
+                expect.objectContaining({
+                    sourceText: 'raid',
+                    targetText: '團本',
+                }),
+            ],
+            count: 1,
+        });
+
+        const entryId = (create.body!.entry as Record<string, unknown>).id as number;
+        const update = await request(server, 'POST', '/api/guild-glossary/guild-1', {
+            cookie: sessionCookie,
+            csrf: csrfToken,
+            body: {
+                id: entryId,
+                sourceText: 'raid',
+                targetText: 'レイド',
+                notes: '',
+            },
+        });
+        expect(update.status).toBe(200);
+        expect((update.body!.entry as Record<string, unknown>).targetText).toBe('レイド');
+
+        const deleted = await request(server, 'DELETE', `/api/guild-glossary/guild-1/${entryId}`, {
+            cookie: sessionCookie,
+            csrf: csrfToken,
+        });
+        expect(deleted.status).toBe(200);
+        expect(deleted.body).toEqual({ ok: true, deleted: entryId });
+    });
+
+    it('should validate glossary entry input', async () => {
+        const res = await request(server, 'POST', '/api/guild-glossary/guild-1', {
+            cookie: sessionCookie,
+            csrf: csrfToken,
+            body: {
+                sourceText: '',
+                targetText: '團本',
+            },
+        });
+
+        expect(res.status).toBe(400);
+        expect(res.body).toEqual({ error: 'Glossary source and target are required' });
     });
 
     // --- Logout ---

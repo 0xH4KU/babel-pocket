@@ -6,6 +6,7 @@ import { isSameLanguage, localeToLang } from './lang.js';
 import type { AppMetricsCollector } from '../../shared/app-metrics.js';
 import { configRepository, type RuntimeConfig } from '../config/config-repository.js';
 import { userPreferenceRepository } from './user-preference-repository.js';
+import { guildGlossaryRepository } from './guild-glossary-repository.js';
 import type {
     RuntimeLimitReason,
     TranslationRuntimeLimiter,
@@ -23,12 +24,13 @@ import {
     discordMessages,
     getDiscordTranslationCommandMessages,
 } from '../../shared/messages/discord-messages.js';
-import type { BotStats, TranslationResult } from '../../types.js';
+import type { BotStats, GuildGlossaryEntry, TranslationResult } from '../../types.js';
 
 type ServiceCommand = 'babel' | 'translate';
 type LangSource = 'option' | 'setlang' | 'locale' | 'auto';
 type TranslatorOptions = {
     metrics?: AppMetricsCollector;
+    glossaryEntries?: Array<Pick<GuildGlossaryEntry, 'sourceText' | 'targetText' | 'notes'>>;
     logContext: {
         requestId: string;
         guildId?: string | null;
@@ -44,6 +46,10 @@ interface ConfigRepositoryLike {
 
 interface UserPreferenceRepositoryLike {
     getLanguage(userId: string): string | null;
+}
+
+interface GlossaryRepositoryLike {
+    listEntries(guildId: string): GuildGlossaryEntry[];
 }
 
 interface UsageLike {
@@ -106,6 +112,7 @@ export interface TranslationServiceDeps {
     stats: BotStats;
     configStore?: ConfigRepositoryLike;
     userPreferenceStore?: UserPreferenceRepositoryLike;
+    glossaryRepository?: GlossaryRepositoryLike;
     usageTracker?: UsageLike;
     translator?: Translator;
     metrics?: AppMetricsCollector;
@@ -140,12 +147,13 @@ function resolveQueueBusyMessage(reason: RuntimeLimitReason, messages: QueueBusy
 function createTranslatorOptions(
     logContext: TranslatorOptions['logContext'],
     metrics?: AppMetricsCollector,
+    glossaryEntries: TranslatorOptions['glossaryEntries'] = [],
 ): TranslatorOptions {
-    if (metrics) {
-        return { logContext, metrics };
-    }
-
-    return { logContext };
+    return {
+        logContext,
+        ...(metrics ? { metrics } : {}),
+        ...(glossaryEntries.length > 0 ? { glossaryEntries } : {}),
+    };
 }
 
 function suggestedActionForErrorType(errorType: string): string {
@@ -210,6 +218,7 @@ export function createTranslationService({
     stats,
     configStore = configRepository,
     userPreferenceStore = userPreferenceRepository,
+    glossaryRepository = guildGlossaryRepository,
     usageTracker = usage,
     translator = translate,
     metrics,
@@ -317,12 +326,17 @@ export function createTranslationService({
             }
 
             const prompt = resolveSystemPrompt(targetLanguage, runtimeConfig.translationPrompt);
+            const glossaryEntries = request.guildId
+                ? glossaryRepository.listEntries(request.guildId)
+                : [];
+            const glossaryVersion = buildGlossaryVersion(glossaryEntries);
             const cacheKey = buildTranslationCacheKey({
                 sourceText: originalText,
                 targetLanguage,
                 geminiModel: runtimeConfig.geminiModel,
                 prompt,
                 maxOutputTokens: runtimeConfig.maxOutputTokens || 1000,
+                glossaryVersion,
             });
 
             let deferred = false;
@@ -411,6 +425,7 @@ export function createTranslationService({
                                         command: request.command,
                                     },
                                     metrics,
+                                    glossaryEntries,
                                 ),
                             );
                             cache.set(cacheKey, result.text);
@@ -439,6 +454,7 @@ export function createTranslationService({
                                     command: request.command,
                                 },
                                 metrics,
+                                glossaryEntries,
                             ),
                         );
                         translated = result.text;
@@ -567,4 +583,19 @@ export const _test = {
     resolveTargetLanguage,
     resolveQueueBusyMessage,
     classifyTranslationError,
+    buildGlossaryVersion,
 };
+
+function buildGlossaryVersion(entries: GuildGlossaryEntry[]): string {
+    return entries
+        .map((entry) =>
+            [
+                entry.id,
+                entry.sourceText.trim(),
+                entry.targetText.trim(),
+                entry.notes.trim(),
+                entry.updatedAt,
+            ].join('\u001f'),
+        )
+        .join('\u001e');
+}

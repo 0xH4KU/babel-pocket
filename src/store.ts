@@ -17,7 +17,14 @@ import {
     type ConfigValueKey,
 } from './persistence/store-defaults.js';
 import { appLogger, type StructuredLogger } from './shared/structured-logger.js';
-import type { GuildBudgetConfig, StoreData, TokenUsage, UsageHistoryEntry } from './types.js';
+import type {
+    GuildBudgetConfig,
+    GuildGlossaryEntry,
+    GuildGlossaryInput,
+    StoreData,
+    TokenUsage,
+    UsageHistoryEntry,
+} from './types.js';
 
 interface ConfigStoreOptions {
     db?: DatabaseSync;
@@ -220,6 +227,88 @@ export class ConfigStore {
         return true;
     }
 
+    listGuildGlossary(guildId: string): GuildGlossaryEntry[] {
+        const rows = this.db
+            .prepare(
+                `
+            SELECT
+                id,
+                guild_id as guildId,
+                source_text as sourceText,
+                target_text as targetText,
+                notes,
+                created_at as createdAt,
+                updated_at as updatedAt
+            FROM guild_glossary
+            WHERE guild_id = ?
+            ORDER BY source_text COLLATE NOCASE ASC, id ASC
+        `,
+            )
+            .all(guildId) as unknown as GuildGlossaryEntry[];
+
+        return rows.map((row) => ({ ...row }));
+    }
+
+    upsertGuildGlossaryEntry(guildId: string, input: GuildGlossaryInput): GuildGlossaryEntry {
+        const sourceText = input.sourceText.trim();
+        const targetText = input.targetText.trim();
+        const notes = input.notes?.trim() ?? '';
+        const now = new Date().toISOString();
+
+        if (!sourceText) {
+            throw new Error('Glossary source text is required');
+        }
+
+        if (!targetText) {
+            throw new Error('Glossary target text is required');
+        }
+
+        if (input.id !== undefined) {
+            const existing = this.getGuildGlossaryEntry(guildId, input.id);
+            if (!existing) {
+                throw new Error('Glossary entry not found');
+            }
+
+            this.db
+                .prepare(
+                    `
+                UPDATE guild_glossary
+                SET source_text = ?, target_text = ?, notes = ?, updated_at = ?
+                WHERE guild_id = ? AND id = ?
+            `,
+                )
+                .run(sourceText, targetText, notes, now, guildId, input.id);
+
+            return this.getGuildGlossaryEntry(guildId, input.id)!;
+        }
+
+        const result = this.db
+            .prepare(
+                `
+            INSERT INTO guild_glossary (
+                guild_id,
+                source_text,
+                target_text,
+                notes,
+                created_at,
+                updated_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?)
+        `,
+            )
+            .run(guildId, sourceText, targetText, notes, now, now);
+
+        return this.getGuildGlossaryEntry(guildId, Number(result.lastInsertRowid))!;
+    }
+
+    deleteGuildGlossaryEntry(guildId: string, entryId: number): boolean {
+        const result = this.db
+            .prepare('DELETE FROM guild_glossary WHERE guild_id = ? AND id = ?')
+            .run(guildId, entryId);
+
+        return result.changes > 0;
+    }
+
     getGuildDailyUsage(guildId: string): TokenUsage | null {
         const row = this.db
             .prepare(
@@ -349,6 +438,27 @@ export class ConfigStore {
             .all() as Array<{ userId: string; language: string }>;
 
         return Object.fromEntries(rows.map((row) => [row.userId, row.language]));
+    }
+
+    private getGuildGlossaryEntry(guildId: string, entryId: number): GuildGlossaryEntry | null {
+        const row = this.db
+            .prepare(
+                `
+            SELECT
+                id,
+                guild_id as guildId,
+                source_text as sourceText,
+                target_text as targetText,
+                notes,
+                created_at as createdAt,
+                updated_at as updatedAt
+            FROM guild_glossary
+            WHERE guild_id = ? AND id = ?
+        `,
+            )
+            .get(guildId, entryId) as GuildGlossaryEntry | undefined;
+
+        return row ? { ...row } : null;
     }
 
     private getAllGuildBudgets(): Record<string, GuildBudgetConfig> {

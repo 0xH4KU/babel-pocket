@@ -259,6 +259,33 @@
     font-size: 0.7rem;
 }
 
+/* --- Server Glossary --- */
+.glossary-form {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+}
+
+.glossary-actions {
+    display: flex;
+    gap: 0.5rem;
+    justify-content: flex-end;
+}
+
+.glossary-table td:last-child {
+    display: flex;
+    gap: 0.4rem;
+    justify-content: flex-end;
+}
+
+.btn-xs {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.7rem;
+    border-radius: 6px;
+}
+
 .btn-xs {
     padding: 0.2rem 0.5rem;
     font-size: 0.7rem;
