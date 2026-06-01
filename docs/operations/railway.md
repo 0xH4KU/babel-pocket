@@ -13,11 +13,7 @@ The repository is Railway-ready:
 - Babel binds the dashboard to `DASHBOARD_HOST`, which defaults to `0.0.0.0`.
 - The Docker image stores SQLite data under `/app/data` when `BABEL_DB_PATH=/app/data/babel.sqlite`.
 
-After publishing the Railway template, replace this placeholder with the real template URL:
-
-```md
-[![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/new/template/YOUR_TEMPLATE_ID?utm_medium=integration&utm_source=button&utm_campaign=babel)
-```
+[![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/deploy/LmHFbD?referralCode=euhy-o&utm_medium=integration&utm_source=template&utm_campaign=generic)
 
 ## Required Variables
 

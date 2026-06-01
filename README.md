@@ -13,14 +13,17 @@ Server owners keep control of hosting, API keys, access rules, and token costs i
 [![Node.js](https://img.shields.io/badge/Node.js-22.5%2B-green.svg)](https://nodejs.org)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue.svg)](https://www.typescriptlang.org/)
 [![discord.js](https://img.shields.io/badge/discord.js-v14-blue.svg)](https://discord.js.org)
-[![Version](https://img.shields.io/badge/version-0.1.1-brightgreen.svg)](package.json)
+[![Version](https://img.shields.io/badge/version-0.1.2-brightgreen.svg)](package.json)
 [![CI](https://github.com/0xH4KU/babel-discord-translator/actions/workflows/ci.yml/badge.svg)](https://github.com/0xH4KU/babel-discord-translator/actions)
+
+[![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/deploy/LmHFbD?referralCode=euhy-o&utm_medium=integration&utm_source=template&utm_campaign=generic)
+[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/P5P51QB1B7)
 
 [Live Dashboard Demo](https://0xh4ku.github.io/babel-discord-translator/demo/) ·
 [Deployment Guide](docs/operations/deployment.md) ·
 [Railway](docs/operations/railway.md) ·
 [Docker Ops](docs/operations/docker.md) ·
-[Support on Ko-fi](https://ko-fi.com/0xh4ku)
+[Changelog](CHANGELOG.md)
 
 </div>
 
@@ -40,7 +43,7 @@ Try the [read-only dashboard demo](https://0xh4ku.github.io/babel-discord-transl
 
 ## Support
 
-Babel is free and self-hosted. If it saves you setup time or helps your community avoid a hosted bot subscription, you can support upstream maintenance on [Ko-fi](https://ko-fi.com/0xh4ku).
+Babel is free and self-hosted. If it saves you setup time or helps your community avoid a hosted bot subscription, you can support upstream maintenance on [Ko-fi](https://ko-fi.com/P5P51QB1B7).
 
 Sponsorship is optional and does not unlock private features. If Babel helps your server avoid a paid translation-bot subscription, supporting maintenance helps fund docs, fixes, deployment templates, and provider updates for everyone.
 
@@ -368,12 +371,13 @@ Hooks are installed automatically on normal local Git checkouts. The `prepare` s
 
 ### Test Coverage
 
-223 tests across 28 suites covering all modules:
+242 tests across 29 suites covering all modules:
 
 | Suite | Tests | Covers |
 |---|---|---|
 | `cache.test.ts` | 10 | LRU eviction, hit/miss stats, versioned cache keys |
-| `config.test.ts` | 4 | Env validation, structured startup logging, development warning, production password refusal |
+| `babel-command.test.ts` | 1 | Context menu command registration metadata |
+| `config.test.ts` | 6 | Env validation, structured startup logging, development warning, production password refusal |
 | `config-repository.test.ts` | 1 | Runtime config reads stay off the full store snapshot path |
 | `config-runtime-effects.test.ts` | 5 | Unified config side effects, cache invalidation, immediate runtime sync |
 | `cooldown.test.ts` | 6 | Rate limiting, cleanup, per-user isolation |
@@ -384,19 +388,20 @@ Hooks are installed automatically on normal local Git checkouts. The `prepare` s
 | `prepare-husky.test.ts` | 5 | Husky prepare skip logic for CI, missing git metadata, Windows/local execution |
 | `build-demo.test.ts` | 1 | Static dashboard demo mirroring and fixture injection |
 | `sqlite-session-repository.test.ts` | 2 | Persistent session storage, enumeration, delete/clear |
-| `dashboard.test.ts` | 31 | Auth flow, session revoke, metrics, health endpoints, stats, config protection, async error handling |
-| `discord-message-format.test.ts` | 2 | Discord-safe chunking and metadata rendering |
+| `dashboard.test.ts` | 37 | Auth flow, session revoke, metrics, health endpoints, stats, config protection, async error handling |
+| `discord-message-format.test.ts` | 3 | Discord-safe chunking and metadata rendering |
 | `message-extraction.test.ts` | 3 | Context menu extraction from content, embeds, attachments, and referenced context |
 | `provider-orchestrator.test.ts` | 5 | Provider fallback ordering, structured errors, and circuit breaker behavior |
 | `translation-runtime-limiter.test.ts` | 4 | FIFO queueing, per-user outstanding cap, queue wait timeout, per-guild/global queue shedding |
-| `translation-service.test.ts` | 11 | Shared workflow, cache hits, runtime shedding, budget/error handling, runtime config access pattern |
+| `translation-service.test.ts` | 12 | Shared workflow, cache hits, runtime shedding, budget/error handling, runtime config access pattern |
 | `translate-command.test.ts` | 2 | `/translate` public/private delivery behavior |
-| `translate.test.ts` | 21 | Retry logic, prompt building, API errors, URL routing, provider metadata |
-| `usage.test.ts` | 26 | Cost calculation, budget estimate guard, per-server budget enforcement, global fallback, day rollover, runtime config access pattern |
+| `translate.test.ts` | 24 | Retry logic, prompt building, API errors, URL routing, provider metadata |
+| `usage.test.ts` | 30 | Cost calculation, budget estimate guard, per-server budget enforcement, global fallback, day rollover, runtime config access pattern |
 | `webhook-service.test.ts` | 4 | Stale webhook recovery, error classification, LRU webhook cache eviction |
 | `vertex-ai-client.test.ts` | 6 | Shared transport, timeout wiring, structured provider errors, health checks, endpoint resolution |
 | `version.test.ts` | 3 | Release metadata, GitHub latest-release checks, and update status fallback |
-| `store.test.ts` | 10 | SQLite persistence, legacy JSON import, defaults, copy safety, config-only reads, direct guild row operations |
+| `sqlite-database.test.ts` | 3 | SQLite connection, migrations, and pragma setup |
+| `store.test.ts` | 11 | SQLite persistence, legacy JSON import, defaults, copy safety, config-only reads, direct guild row operations |
 | `structured-logger.test.ts` | 2 | JSON shape, inherited request context, secret redaction |
 | `shutdown.test.ts` | 3 | Shutdown order, timeout forcing, signal deduplication |
 
@@ -474,16 +479,6 @@ The Dockerfile uses a **multi-stage build** with Node.js `22-alpine`:
 - [Deployment guide](docs/operations/deployment.md)
 - [Alerts runbook](docs/operations/alerts-runbook.md)
 - [SQLite backup and restore](docs/operations/sqlite-backup-restore.md)
-
-### 0.1.1 Release Notes
-
-Babel `0.1.1` adds a read-only static dashboard demo for GitHub Pages, Ko-fi support links for upstream maintenance, and dashboard update checks that turn the version badge yellow when a newer GitHub release is available.
-
-### 0.1.0 Release Notes
-
-Babel `0.1.0` is the first release-tagged operations build. It adds visible version metadata in the README, dashboard, `/api/version`, and `/metrics`; provider fallback diagnostics; bounded translation queue controls; budget estimate guards; dashboard operations guidance; dashboard session revoke controls; and Prometheus-ready metrics for release monitoring.
-
----
 
 ## Runtime Limiting Model
 

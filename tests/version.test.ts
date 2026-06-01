@@ -18,13 +18,13 @@ describe('version metadata', () => {
         _test.resetVersionUpdateCache();
         const fetchImpl = vi.fn(async () =>
             jsonResponse({
-                tag_name: 'v0.1.2',
-                html_url: 'https://github.com/0xH4KU/babel-discord-translator/releases/tag/v0.1.2',
+                tag_name: 'v0.1.3',
+                html_url: 'https://github.com/0xH4KU/babel-discord-translator/releases/tag/v0.1.3',
             }),
         );
 
         const update = await getVersionUpdateStatus({
-            currentVersion: '0.1.1',
+            currentVersion: '0.1.2',
             fetchImpl,
             latestReleaseUrl: 'https://example.test/releases/latest',
             cacheTtlMs: 0,
@@ -32,8 +32,8 @@ describe('version metadata', () => {
 
         expect(update).toEqual({
             status: 'outdated',
-            latestVersion: '0.1.2',
-            latestUrl: 'https://github.com/0xH4KU/babel-discord-translator/releases/tag/v0.1.2',
+            latestVersion: '0.1.3',
+            latestUrl: 'https://github.com/0xH4KU/babel-discord-translator/releases/tag/v0.1.3',
         });
         expect(fetchImpl).toHaveBeenCalledWith('https://example.test/releases/latest', {
             headers: {
@@ -47,25 +47,25 @@ describe('version metadata', () => {
         _test.resetVersionUpdateCache();
         const fetchImpl = vi.fn(async () =>
             jsonResponse({
-                tag_name: 'v0.1.1',
-                html_url: 'https://github.com/0xH4KU/babel-discord-translator/releases/tag/v0.1.1',
+                tag_name: 'v0.1.2',
+                html_url: 'https://github.com/0xH4KU/babel-discord-translator/releases/tag/v0.1.2',
             }),
         );
 
         const metadata = await getVersionMetadataWithUpdate({
-            currentVersion: '0.1.1',
+            currentVersion: '0.1.2',
             fetchImpl,
             latestReleaseUrl: 'https://example.test/releases/latest',
             cacheTtlMs: 0,
         });
 
         expect(metadata).toEqual({
-            version: '0.1.1',
+            version: '0.1.2',
             repositoryUrl: 'https://github.com/0xH4KU/babel-discord-translator',
             update: {
                 status: 'current',
-                latestVersion: '0.1.1',
-                latestUrl: 'https://github.com/0xH4KU/babel-discord-translator/releases/tag/v0.1.1',
+                latestVersion: '0.1.2',
+                latestUrl: 'https://github.com/0xH4KU/babel-discord-translator/releases/tag/v0.1.2',
             },
         });
     });
@@ -77,7 +77,7 @@ describe('version metadata', () => {
         );
 
         const update = await getVersionUpdateStatus({
-            currentVersion: '0.1.1',
+            currentVersion: '0.1.2',
             fetchImpl,
             latestReleaseUrl: 'https://example.test/releases/latest',
             cacheTtlMs: 0,
