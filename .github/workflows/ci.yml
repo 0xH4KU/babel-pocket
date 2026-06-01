@@ -46,7 +46,17 @@ jobs:
         run: |
           test -f dist/src/index.js
           test -f dist/src/public/index.html
-          node --input-type=module -e "const v = await import('./dist/src/shared/version.js'); if (v.APP_VERSION !== '0.1.1') process.exit(1);"
+          node --input-type=module <<'NODE'
+          import { readFileSync } from 'node:fs';
+
+          const { version } = JSON.parse(readFileSync('package.json', 'utf8'));
+          const { APP_VERSION } = await import('./dist/src/shared/version.js');
+
+          if (APP_VERSION !== version) {
+            console.error(`Expected APP_VERSION ${version}, got ${APP_VERSION}`);
+            process.exit(1);
+          }
+          NODE
 
   docker:
     runs-on: ubuntu-latest
