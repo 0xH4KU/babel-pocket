@@ -6,7 +6,7 @@
     const banner = document.createElement('div');
     banner.className = 'demo-banner';
     banner.innerHTML =
-      '<div><strong>Babel dashboard demo</strong><span>Mock data only. No Discord or AI provider is connected.</span></div>' +
+      '<div><strong>Babel Pocket dashboard demo</strong><span>Mock data only. No Discord or AI provider is connected.</span></div>' +
       '<div class="demo-badge">Read-only demo</div>';
     document.body.prepend(banner);
   }
@@ -17,7 +17,7 @@
       '#wizard-view',
       '#cfg-apikey',
       '#cfg-openai-apikey',
-      '#add-guild-input',
+      '#add-user-input',
       '#prefs-batch-delete',
       '[onclick*="save"]',
       '[onclick*="delete"]',

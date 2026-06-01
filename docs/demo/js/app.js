@@ -34,9 +34,9 @@ function renderVersionMetadata(data) {
     if (data.update.latestUrl) link.href = data.update.latestUrl;
   } else if (data.update?.status === 'current') {
     link.classList.add('update-current');
-    link.title = `Babel is up to date: v${data.version}`;
+    link.title = `Babel Pocket is up to date: v${data.version}`;
   } else if (data.update?.status === 'unknown') {
-    link.title = 'Could not check the latest Babel release';
+    link.title = 'Could not check the latest Babel Pocket release';
   }
 }
 

@@ -24,12 +24,14 @@ vi.mock('../src/store.js', () => {
         openaiModel: '',
         translationProvider: 'vertex',
         allowedGuildIds: [],
+        allowedUserIds: [],
         cooldownSeconds: 5,
         cacheMaxSize: 2000,
         setupComplete: true,
         inputPricePerMillion: 0,
         outputPricePerMillion: 0,
         dailyBudgetUsd: 0,
+        defaultUserDailyBudgetUsd: 0,
         translationPrompt: '',
         userLanguagePrefs: { user1: 'ja', user2: 'ko' },
         maxInputLength: 2000,
@@ -44,6 +46,9 @@ vi.mock('../src/store.js', () => {
         guildBudgets: {},
         guildTokenUsage: {},
         guildUsageHistory: {},
+        userBudgets: {},
+        userTokenUsage: {},
+        userUsageHistory: {},
     };
     const glossary: Record<
         string,
@@ -86,6 +91,20 @@ vi.mock('../src/store.js', () => {
                 const budgets = data.guildBudgets as Record<string, unknown>;
                 if (!(guildId in budgets)) return false;
                 delete budgets[guildId];
+                return true;
+            }),
+            getUserBudget: vi.fn((userId: string) => {
+                const budgets = data.userBudgets as Record<string, unknown>;
+                return budgets[userId] ?? null;
+            }),
+            setUserBudget: vi.fn((userId: string, dailyBudgetUsd: number) => {
+                const budgets = data.userBudgets as Record<string, unknown>;
+                budgets[userId] = { dailyBudgetUsd };
+            }),
+            clearUserBudget: vi.fn((userId: string) => {
+                const budgets = data.userBudgets as Record<string, unknown>;
+                if (!(userId in budgets)) return false;
+                delete budgets[userId];
                 return true;
             }),
             listGuildGlossary: vi.fn((guildId: string) => glossary[guildId] ?? []),
@@ -150,6 +169,18 @@ const usageMock = vi.hoisted(() => ({
         budgetExceeded: false,
     })),
     getGuildStatsForGuilds: vi.fn(() => ({})),
+    getUserStats: vi.fn((_userId: string) => ({
+        date: '2025-03-01',
+        inputTokens: 0,
+        outputTokens: 0,
+        requests: 0,
+        inputCost: 0,
+        outputCost: 0,
+        totalCost: 0,
+        dailyBudget: 0,
+        budgetUsedPercent: 0,
+        budgetExceeded: false,
+    })),
     getHistory: vi.fn(() => []),
     record: vi.fn(),
 }));
@@ -289,11 +320,11 @@ describe('Dashboard API', () => {
         healthCheck = vi.fn().mockResolvedValue({ healthy: true, latencyMs: 24 });
         versionCheck = vi.fn().mockResolvedValue({
             version: '0.1.2',
-            repositoryUrl: 'https://github.com/0xH4KU/babel-discord-translator',
+            repositoryUrl: 'https://github.com/0xH4KU/babel-pocket',
             update: {
                 status: 'current',
                 latestVersion: '0.1.2',
-                latestUrl: 'https://github.com/0xH4KU/babel-discord-translator/releases/tag/v0.1.2',
+                latestUrl: 'https://github.com/0xH4KU/babel-pocket/releases/tag/v0.1.2',
             },
         });
         const cooldown = new CooldownManager(5);
@@ -455,7 +486,7 @@ describe('Dashboard API', () => {
             cookie: sessionCookie,
         });
         expect(res.status).toBe(200);
-        expect(usageMock.getGuildStatsForGuilds).toHaveBeenCalledOnce();
+        expect(res.body!.userBudgets).toEqual([]);
         expect((res.body!.bot as Record<string, unknown>).name).toBe('Babel#1234');
         expect((res.body!.translations as Record<string, unknown>).total).toBe(42);
         expect((res.body!.metrics as Record<string, unknown>).translationFailuresTotal).toBe(1);
@@ -466,7 +497,7 @@ describe('Dashboard API', () => {
         expect((res.body!.bot as Record<string, unknown>).memory).toBeDefined();
     });
 
-    it('should show shared global budget usage for guilds without custom budgets', async () => {
+    it('should show default user budget usage for whitelisted users', async () => {
         usageMock.getStats.mockReturnValueOnce({
             date: '2025-03-01',
             inputTokens: 1_000_000,
@@ -479,56 +510,71 @@ describe('Dashboard API', () => {
             budgetUsedPercent: 100,
             budgetExceeded: true,
         });
-        usageMock.getGuildStatsForGuilds.mockReturnValueOnce({
-            'guild-1': {
-                date: '2025-03-01',
-                inputTokens: 600_000,
-                outputTokens: 0,
-                requests: 6,
-                inputCost: 0.6,
-                outputCost: 0,
+        const { store } = await import('../src/store.js');
+        const previousAllowedUserIds = store.get('allowedUserIds');
+        const previousDefaultUserBudget = store.get('defaultUserDailyBudgetUsd');
+
+        usageMock.getUserStats.mockImplementation((userId: string) => ({
+            date: '2025-03-01',
+            inputTokens: userId === 'user-1' ? 600_000 : 400_000,
+            outputTokens: 0,
+            requests: userId === 'user-1' ? 6 : 4,
+            inputCost: userId === 'user-1' ? 0.6 : 0.4,
+            outputCost: 0,
+            totalCost: userId === 'user-1' ? 0.6 : 0.4,
+            dailyBudget: 1,
+            budgetUsedPercent: userId === 'user-1' ? 60 : 40,
+            budgetExceeded: false,
+        }));
+
+        try {
+            store.update({
+                allowedUserIds: ['user-1', 'user-2'],
+                defaultUserDailyBudgetUsd: 1,
+            });
+
+            const res = await request(server, 'GET', '/api/stats', {
+                cookie: sessionCookie,
+            });
+
+            expect(res.status).toBe(200);
+            const userBudgets = res.body!.userBudgets as Array<Record<string, unknown>>;
+            const userOne = userBudgets.find((user) => user.id === 'user-1');
+            const userTwo = userBudgets.find((user) => user.id === 'user-2');
+
+            expect(userOne).toMatchObject({
+                isCustom: false,
+                budget: 1,
                 totalCost: 0.6,
-                dailyBudget: 1,
-                budgetUsedPercent: 60,
-                budgetExceeded: false,
-            },
-            'guild-2': {
-                date: '2025-03-01',
-                inputTokens: 400_000,
-                outputTokens: 0,
-                requests: 4,
-                inputCost: 0.4,
-                outputCost: 0,
+                requests: 6,
+                exceeded: false,
+            });
+            expect(userTwo).toMatchObject({
+                isCustom: false,
+                budget: 1,
                 totalCost: 0.4,
-                dailyBudget: 1,
-                budgetUsedPercent: 40,
+                requests: 4,
+                exceeded: false,
+            });
+        } finally {
+            store.update({
+                allowedUserIds: previousAllowedUserIds,
+                defaultUserDailyBudgetUsd: previousDefaultUserBudget,
+            });
+            usageMock.getUserStats.mockReset();
+            usageMock.getUserStats.mockImplementation((_userId: string) => ({
+                date: '2025-03-01',
+                inputTokens: 0,
+                outputTokens: 0,
+                requests: 0,
+                inputCost: 0,
+                outputCost: 0,
+                totalCost: 0,
+                dailyBudget: 0,
+                budgetUsedPercent: 0,
                 budgetExceeded: false,
-            },
-        });
-
-        const res = await request(server, 'GET', '/api/stats', {
-            cookie: sessionCookie,
-        });
-
-        expect(res.status).toBe(200);
-        const guildBudgets = res.body!.guildBudgets as Array<Record<string, unknown>>;
-        const guildOne = guildBudgets.find((guild) => guild.id === 'guild-1');
-        const guildTwo = guildBudgets.find((guild) => guild.id === 'guild-2');
-
-        expect(guildOne).toMatchObject({
-            isCustom: false,
-            budget: 1,
-            totalCost: 1,
-            requests: 10,
-            exceeded: true,
-        });
-        expect(guildTwo).toMatchObject({
-            isCustom: false,
-            budget: 1,
-            totalCost: 1,
-            requests: 10,
-            exceeded: true,
-        });
+            }));
+        }
     });
 
     it('should return shared global budget usage from guild budget API', async () => {
@@ -576,9 +622,46 @@ describe('Dashboard API', () => {
         });
     });
 
-    it('should show custom guild budget usage separately from the global budget pool', async () => {
+    it('should update allowed user ids from the config API', async () => {
         const { store } = await import('../src/store.js');
-        const previousGuildBudgets = store.get('guildBudgets');
+
+        const res = await request(server, 'POST', '/api/config', {
+            cookie: sessionCookie,
+            csrf: csrfToken,
+            body: { allowedUserIds: ['user-1', 'user-2'] },
+        });
+
+        expect(res.status).toBe(200);
+        expect(store.get('allowedUserIds')).toEqual(['user-1', 'user-2']);
+    });
+
+    it('should set and clear user budgets', async () => {
+        const { store } = await import('../src/store.js');
+
+        const setRes = await request(server, 'POST', '/api/user-budgets/user-1', {
+            cookie: sessionCookie,
+            csrf: csrfToken,
+            body: { dailyBudgetUsd: 1.5 },
+        });
+        expect(setRes.status).toBe(200);
+        expect(setRes.body).toEqual({ ok: true, budget: 1.5 });
+        expect(store.getUserBudget('user-1')).toEqual({ dailyBudgetUsd: 1.5 });
+
+        const clearRes = await request(server, 'POST', '/api/user-budgets/user-1', {
+            cookie: sessionCookie,
+            csrf: csrfToken,
+            body: { dailyBudgetUsd: null },
+        });
+        expect(clearRes.status).toBe(200);
+        expect(clearRes.body).toEqual({ ok: true, mode: 'default' });
+        expect(store.getUserBudget('user-1')).toBeNull();
+    });
+
+    it('should show custom user budget usage separately from the default user budget', async () => {
+        const { store } = await import('../src/store.js');
+        const previousAllowedUserIds = store.get('allowedUserIds');
+        const previousDefaultUserBudget = store.get('defaultUserDailyBudgetUsd');
+        const previousUserBudgets = store.get('userBudgets');
 
         usageMock.getStats.mockReturnValueOnce({
             date: '2025-03-01',
@@ -592,41 +675,43 @@ describe('Dashboard API', () => {
             budgetUsedPercent: 80,
             budgetExceeded: false,
         });
-        usageMock.getGuildStatsForGuilds.mockReturnValueOnce({
-            'guild-1': {
-                date: '2025-03-01',
-                inputTokens: 200_000,
-                outputTokens: 0,
-                requests: 2,
-                inputCost: 0.2,
-                outputCost: 0,
-                totalCost: 0.2,
-                dailyBudget: 2,
-                budgetUsedPercent: 10,
-                budgetExceeded: false,
-            },
-        });
+        usageMock.getUserStats.mockImplementation((userId: string) => ({
+            date: '2025-03-01',
+            inputTokens: userId === 'user-1' ? 200_000 : 800_000,
+            outputTokens: 0,
+            requests: userId === 'user-1' ? 2 : 8,
+            inputCost: userId === 'user-1' ? 0.2 : 0.8,
+            outputCost: 0,
+            totalCost: userId === 'user-1' ? 0.2 : 0.8,
+            dailyBudget: userId === 'user-1' ? 2 : 1,
+            budgetUsedPercent: userId === 'user-1' ? 10 : 80,
+            budgetExceeded: false,
+        }));
 
         try {
-            store.update({ guildBudgets: { 'guild-1': { dailyBudgetUsd: 2 } } });
+            store.update({
+                allowedUserIds: ['user-1', 'user-2'],
+                defaultUserDailyBudgetUsd: 1,
+                userBudgets: { 'user-1': { dailyBudgetUsd: 2 } },
+            });
 
             const res = await request(server, 'GET', '/api/stats', {
                 cookie: sessionCookie,
             });
 
             expect(res.status).toBe(200);
-            const guildBudgets = res.body!.guildBudgets as Array<Record<string, unknown>>;
-            const guildOne = guildBudgets.find((guild) => guild.id === 'guild-1');
-            const guildTwo = guildBudgets.find((guild) => guild.id === 'guild-2');
+            const userBudgets = res.body!.userBudgets as Array<Record<string, unknown>>;
+            const userOne = userBudgets.find((user) => user.id === 'user-1');
+            const userTwo = userBudgets.find((user) => user.id === 'user-2');
 
-            expect(guildOne).toMatchObject({
+            expect(userOne).toMatchObject({
                 isCustom: true,
                 budget: 2,
                 totalCost: 0.2,
                 requests: 2,
                 exceeded: false,
             });
-            expect(guildTwo).toMatchObject({
+            expect(userTwo).toMatchObject({
                 isCustom: false,
                 budget: 1,
                 totalCost: 0.8,
@@ -634,7 +719,24 @@ describe('Dashboard API', () => {
                 exceeded: false,
             });
         } finally {
-            store.update({ guildBudgets: previousGuildBudgets });
+            store.update({
+                allowedUserIds: previousAllowedUserIds,
+                defaultUserDailyBudgetUsd: previousDefaultUserBudget,
+                userBudgets: previousUserBudgets,
+            });
+            usageMock.getUserStats.mockReset();
+            usageMock.getUserStats.mockImplementation((_userId: string) => ({
+                date: '2025-03-01',
+                inputTokens: 0,
+                outputTokens: 0,
+                requests: 0,
+                inputCost: 0,
+                outputCost: 0,
+                totalCost: 0,
+                dailyBudget: 0,
+                budgetUsedPercent: 0,
+                budgetExceeded: false,
+            }));
         }
     });
 
@@ -659,11 +761,11 @@ describe('Dashboard API', () => {
         expect(res.status).toBe(200);
         expect(res.body).toEqual({
             version: '0.1.2',
-            repositoryUrl: 'https://github.com/0xH4KU/babel-discord-translator',
+            repositoryUrl: 'https://github.com/0xH4KU/babel-pocket',
             update: {
                 status: 'current',
                 latestVersion: '0.1.2',
-                latestUrl: 'https://github.com/0xH4KU/babel-discord-translator/releases/tag/v0.1.2',
+                latestUrl: 'https://github.com/0xH4KU/babel-pocket/releases/tag/v0.1.2',
             },
         });
         expect(versionCheck).toHaveBeenCalled();
@@ -673,11 +775,11 @@ describe('Dashboard API', () => {
         versionCheck.mockClear();
         versionCheck.mockResolvedValueOnce({
             version: '0.1.2',
-            repositoryUrl: 'https://github.com/0xH4KU/babel-discord-translator',
+            repositoryUrl: 'https://github.com/0xH4KU/babel-pocket',
             update: {
                 status: 'outdated',
                 latestVersion: '0.1.3',
-                latestUrl: 'https://github.com/0xH4KU/babel-discord-translator/releases/tag/v0.1.3',
+                latestUrl: 'https://github.com/0xH4KU/babel-pocket/releases/tag/v0.1.3',
             },
         });
 
@@ -689,11 +791,11 @@ describe('Dashboard API', () => {
         expect(res.status).toBe(200);
         expect(res.body).toEqual({
             version: '0.1.2',
-            repositoryUrl: 'https://github.com/0xH4KU/babel-discord-translator',
+            repositoryUrl: 'https://github.com/0xH4KU/babel-pocket',
             update: {
                 status: 'outdated',
                 latestVersion: '0.1.3',
-                latestUrl: 'https://github.com/0xH4KU/babel-discord-translator/releases/tag/v0.1.3',
+                latestUrl: 'https://github.com/0xH4KU/babel-pocket/releases/tag/v0.1.3',
             },
         });
         expect(versionCheck).toHaveBeenCalledWith({ forceRefresh: true });
@@ -745,7 +847,7 @@ describe('Dashboard API', () => {
             expect(res.status).toBe(200);
             expect(res.headers['content-type']).toContain('text/plain');
             expect(res.text).toContain(
-                'babel_app_version_info{version="0.1.2",repository_url="https://github.com/0xH4KU/babel-discord-translator"} 1',
+                'babel_app_version_info{version="0.1.2",repository_url="https://github.com/0xH4KU/babel-pocket"} 1',
             );
             expect(res.text).toContain('babel_translations_total');
             expect(res.text).toContain('babel_translation_failures_total');

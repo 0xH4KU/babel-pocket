@@ -1,8 +1,8 @@
 services:
-  babel:
+  babel-pocket:
     build: .
-    image: babel-discord-translator:local
-    container_name: babel-translator
+    image: babel-pocket:local
+    container_name: babel-pocket
     restart: unless-stopped
     env_file:
       - .env
@@ -14,7 +14,7 @@ services:
     ports:
       - "3000:3000"
     volumes:
-      - babel_data:/app/data
+      - babel_pocket_data:/app/data
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:3000/livez"]
       interval: 30s
@@ -23,4 +23,4 @@ services:
       start_period: 10s
 
 volumes:
-  babel_data:
+  babel_pocket_data:

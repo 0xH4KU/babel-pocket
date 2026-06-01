@@ -32,29 +32,29 @@ function createOpsMetric(label, value) {
     return metric;
 }
 
-function renderGuildBudgetOverview(container, guilds) {
+function renderBudgetOverview(container, items) {
     container.replaceChildren();
 
-    guilds.forEach((guild) => {
+    items.forEach((user) => {
         const item = document.createElement('div');
         item.className = 'guild-budget-overview-item';
 
         const name = document.createElement('span');
         name.className = 'gbo-name';
-        name.textContent = guild.name || 'Unknown server';
-        if (!guild.isCustom && guild.budget > 0) {
+        name.textContent = user.name || user.id || 'Unknown user';
+        if (!user.isCustom && user.budget > 0) {
             const tag = document.createElement('span');
             tag.className = 'gbo-tag';
-            tag.textContent = 'global';
+            tag.textContent = 'default';
             name.append(' ', tag);
         }
 
         const cost = document.createElement('span');
         cost.className = 'gbo-cost';
 
-        if (guild.budget <= 0) {
+        if (user.budget <= 0) {
             cost.textContent =
-                formatUsd(guild.totalCost) + ' · ' + formatOpsNumber(guild.requests) + ' req';
+                formatUsd(user.totalCost) + ' · ' + formatOpsNumber(user.requests) + ' req';
 
             const limit = document.createElement('span');
             limit.className = 'gbo-limit';
@@ -65,9 +65,9 @@ function renderGuildBudgetOverview(container, guilds) {
             return;
         }
 
-        cost.textContent = formatUsd(guild.totalCost) + ' / ' + formatUsd(guild.budget);
+        cost.textContent = formatUsd(user.totalCost) + ' / ' + formatUsd(user.budget);
 
-        const rawPct = (Number(guild.totalCost || 0) / Number(guild.budget || 1)) * 100;
+        const rawPct = (Number(user.totalCost || 0) / Number(user.budget || 1)) * 100;
         const pct = Number.isFinite(rawPct) ? Math.min(Math.max(rawPct, 0), 100) : 0;
         const bar = document.createElement('div');
         bar.className = 'gbo-bar';
@@ -84,7 +84,7 @@ function renderGuildBudgetOverview(container, guilds) {
 
         item.append(name, cost, bar);
 
-        if (guild.exceeded) {
+        if (user.exceeded) {
             const exceeded = document.createElement('span');
             exceeded.className = 'gbo-exceeded';
             exceeded.textContent = 'EXCEEDED';
@@ -278,10 +278,10 @@ async function loadStats() {
         document.getElementById('stat-cost-breakdown').textContent =
             parts.join(' / ') || 'No usage today';
 
-        // Budget overview — per-server
+        // Budget overview
         const budgetCard = document.getElementById('budget-card');
-        const guilds = d.guildBudgets || [];
-        const hasAnyBudget = guilds.some((g) => g.budget > 0);
+        const userBudgets = d.userBudgets || d.guildBudgets || [];
+        const hasAnyBudget = userBudgets.some((user) => user.budget > 0);
 
         if (hasAnyBudget || d.usage.dailyBudget > 0) {
             budgetCard.style.display = '';
@@ -289,8 +289,8 @@ async function loadStats() {
                 'Total: ' + formatUsd(d.usage.totalCost);
 
             const container = document.getElementById('guild-budget-overview');
-            if (guilds.length > 0) {
-                renderGuildBudgetOverview(container, guilds);
+            if (userBudgets.length > 0) {
+                renderBudgetOverview(container, userBudgets);
             } else {
                 container.replaceChildren();
             }
@@ -311,7 +311,7 @@ async function loadStats() {
         const memory = d.bot.memory || {};
         const rssMB = memory.rssMB || d.bot.memoryMB || '?';
         document.getElementById('stat-memory').textContent =
-            'RSS ' + rssMB + ' MB · ' + d.bot.guilds + ' servers';
+            'RSS ' + rssMB + ' MB · ' + (d.userBudgets || []).length + ' allowed users';
     } catch {}
 }
 

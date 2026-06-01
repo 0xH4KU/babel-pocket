@@ -40,7 +40,7 @@ describe('build-dashboard-demo', () => {
         buildDashboardDemo({ publicDir, demoDir });
 
         const html = readFileSync(join(demoDir, 'index.html'), 'utf-8');
-        expect(html).toContain('<title>Babel — Dashboard Demo</title>');
+        expect(html).toContain('<title>Babel Pocket — Dashboard Demo</title>');
         expect(html).toContain('<script src="demo/demo-api.js"></script>');
         expect(html).toContain('<script src="demo/demo-readonly.js"></script>');
         expect(html).toContain('<link rel="stylesheet" href="demo/demo.css" />');
@@ -52,7 +52,7 @@ describe('build-dashboard-demo', () => {
             'window.BABEL_DEMO',
         );
         expect(readFileSync(join(demoDir, 'demo', 'fixtures', 'stats.json'), 'utf-8')).toContain(
-            'Babel Demo#0110',
+            'Babel Pocket Demo#0110',
         );
     });
 });

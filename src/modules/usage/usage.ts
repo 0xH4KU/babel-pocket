@@ -1,9 +1,10 @@
 /**
  * Daily token usage tracker with cost calculation, budget enforcement,
- * and 30-day history archiving. Supports both global and per-guild tracking.
+ * and 30-day history archiving. Supports global, per-guild, and per-user tracking.
  */
 import { configRepository, type RuntimeConfig } from '../config/config-repository.js';
 import { guildBudgetRepository } from './guild-budget-repository.js';
+import { userBudgetRepository } from './user-budget-repository.js';
 import { usageRepository } from './usage-repository.js';
 import type {
     UsageCost,
@@ -12,6 +13,13 @@ import type {
     TokenUsage,
     UsageHistoryEntry,
 } from '../../types.js';
+
+export interface UsageScope {
+    guildId?: string | null;
+    userId?: string | null;
+}
+
+type LegacyUsageScope = UsageScope | string | null | undefined;
 
 class UsageTracker {
     constructor() {
@@ -46,10 +54,24 @@ class UsageTracker {
                 usageRepository.saveGuildDailyUsage(guildId, createEmptyUsage(today));
             }
         }
+
+        const userUsage = usageRepository.getAllUserDailyUsage();
+
+        for (const userId of Object.keys(userUsage)) {
+            const usageEntry = userUsage[userId];
+            if (usageEntry && usageEntry.date !== today) {
+                const history = usageRepository.getUserUsageHistory(userId);
+                history.push(toHistoryEntry(usageEntry));
+                while (history.length > 30) history.shift();
+                usageRepository.saveUserUsageHistory(userId, history);
+                usageRepository.saveUserDailyUsage(userId, createEmptyUsage(today));
+            }
+        }
     }
 
-    /** Record a translation's token usage (global + optional guild). */
-    record(inputTokens: number, outputTokens: number, guildId?: string | null): void {
+    /** Record a translation's token usage (global + optional guild/user). */
+    record(inputTokens: number, outputTokens: number, scopeInput?: LegacyUsageScope): void {
+        const scope = normalizeUsageScope(scopeInput);
         this.ensureToday();
 
         const usage = usageRepository.getDailyUsage() ?? createEmptyUsage(today());
@@ -58,16 +80,28 @@ class UsageTracker {
         usage.requests += 1;
         usageRepository.saveDailyUsage(usage);
 
-        if (guildId) {
+        if (scope.guildId) {
             const todayValue = today();
-            const currentUsage = usageRepository.getGuildDailyUsage(guildId);
+            const currentUsage = usageRepository.getGuildDailyUsage(scope.guildId);
             const entry =
                 currentUsage?.date === todayValue ? currentUsage : createEmptyUsage(todayValue);
 
             entry.inputTokens += inputTokens || 0;
             entry.outputTokens += outputTokens || 0;
             entry.requests += 1;
-            usageRepository.saveGuildDailyUsage(guildId, entry);
+            usageRepository.saveGuildDailyUsage(scope.guildId, entry);
+        }
+
+        if (scope.userId) {
+            const todayValue = today();
+            const currentUsage = usageRepository.getUserDailyUsage(scope.userId);
+            const entry =
+                currentUsage?.date === todayValue ? currentUsage : createEmptyUsage(todayValue);
+
+            entry.inputTokens += inputTokens || 0;
+            entry.outputTokens += outputTokens || 0;
+            entry.requests += 1;
+            usageRepository.saveUserDailyUsage(scope.userId, entry);
         }
     }
 
@@ -97,14 +131,29 @@ class UsageTracker {
         );
     }
 
+    /** Calculate today's cost for a specific user. */
+    getUserCost(userId: string, runtimeConfig = configRepository.getRuntimeConfig()): UsageCost {
+        this.ensureToday();
+        const todayValue = today();
+        const userUsage = usageRepository.getUserDailyUsage(userId);
+        const usage = userUsage?.date === todayValue ? userUsage : createEmptyUsage(todayValue);
+
+        return withCost(
+            usage,
+            runtimeConfig.inputPricePerMillion || 0,
+            runtimeConfig.outputPricePerMillion || 0,
+        );
+    }
+
     /**
      * Check if daily budget is exceeded.
      * If guildId is provided, checks guild-specific budget first,
      * then falls back to the global budget.
      */
-    isBudgetExceeded(guildId?: string | null): boolean {
+    isBudgetExceeded(scopeInput?: LegacyUsageScope): boolean {
+        const scope = normalizeUsageScope(scopeInput);
         const runtimeConfig = configRepository.getRuntimeConfig();
-        const { budget, cost } = this.getBudgetScope(guildId, runtimeConfig);
+        const { budget, cost } = this.getBudgetScope(scope, runtimeConfig);
 
         if (budget <= 0) return false;
         return cost.totalCost >= budget;
@@ -114,13 +163,15 @@ class UsageTracker {
         estimatedInputTokens,
         estimatedOutputTokens,
         guildId,
+        userId,
     }: {
         estimatedInputTokens: number;
         estimatedOutputTokens: number;
         guildId?: string | null;
+        userId?: string | null;
     }): boolean {
         const runtimeConfig = configRepository.getRuntimeConfig();
-        const { budget, cost } = this.getBudgetScope(guildId, runtimeConfig);
+        const { budget, cost } = this.getBudgetScope({ guildId, userId }, runtimeConfig);
 
         if (budget <= 0) return false;
 
@@ -132,15 +183,30 @@ class UsageTracker {
     }
 
     private getBudgetScope(
-        guildId: string | null | undefined,
+        scope: UsageScope,
         runtimeConfig: RuntimeConfig,
     ): { budget: number; cost: UsageCost } {
-        if (guildId) {
-            const guildBudget = guildBudgetRepository.getBudget(guildId);
+        if (scope.userId) {
+            const userBudget = userBudgetRepository.getBudget(scope.userId);
+            if (userBudget) {
+                return {
+                    budget: userBudget.dailyBudgetUsd,
+                    cost: this.getUserCost(scope.userId, runtimeConfig),
+                };
+            }
+
+            return {
+                budget: runtimeConfig.defaultUserDailyBudgetUsd || 0,
+                cost: this.getUserCost(scope.userId, runtimeConfig),
+            };
+        }
+
+        if (scope.guildId) {
+            const guildBudget = guildBudgetRepository.getBudget(scope.guildId);
             if (guildBudget) {
                 return {
                     budget: guildBudget.dailyBudgetUsd,
-                    cost: this.getGuildCost(guildId, runtimeConfig),
+                    cost: this.getGuildCost(scope.guildId, runtimeConfig),
                 };
             }
         }
@@ -167,6 +233,17 @@ class UsageTracker {
         const budget =
             guildBudgetRepository.getBudget(guildId)?.dailyBudgetUsd ??
             (runtimeConfig.dailyBudgetUsd || 0);
+
+        return toUsageStats(cost, budget);
+    }
+
+    /** Get stats for a specific user. */
+    getUserStats(userId: string): UsageStats {
+        const runtimeConfig = configRepository.getRuntimeConfig();
+        const cost = this.getUserCost(userId, runtimeConfig);
+        const budget =
+            userBudgetRepository.getBudget(userId)?.dailyBudgetUsd ??
+            (runtimeConfig.defaultUserDailyBudgetUsd || 0);
 
         return toUsageStats(cost, budget);
     }
@@ -224,6 +301,19 @@ class UsageTracker {
         }));
     }
 
+    /** Get usage history for a specific user (last 30 days). */
+    getUserHistory(userId: string): UsageHistoryDay[] {
+        this.ensureToday();
+        const history = usageRepository.getUserUsageHistory(userId);
+        const runtimeConfig = configRepository.getRuntimeConfig();
+
+        return history.map((day) => ({
+            ...day,
+            totalTokens: day.inputTokens + day.outputTokens,
+            cost: calculateCost(day, runtimeConfig),
+        }));
+    }
+
     private getSharedGlobalBudgetCost(runtimeConfig: RuntimeConfig): UsageCost {
         this.ensureToday();
         const todayValue = today();
@@ -254,6 +344,18 @@ class UsageTracker {
             runtimeConfig.outputPricePerMillion || 0,
         );
     }
+}
+
+function normalizeUsageScope(scope: LegacyUsageScope): UsageScope {
+    if (typeof scope === 'string') {
+        return { guildId: scope };
+    }
+
+    if (!scope) {
+        return {};
+    }
+
+    return scope;
 }
 
 function today(): string {

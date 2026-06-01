@@ -240,6 +240,60 @@ describe('ConfigStore', () => {
         store.close();
     });
 
+    it('should support allowed user config values', async () => {
+        const { ConfigStore } = await importStoreModule();
+        const store = new ConfigStore({ dbPath, autoImportLegacyJson: false });
+
+        expect(store.get('allowedUserIds')).toEqual([]);
+        store.set('allowedUserIds', ['user-1', 'user-2']);
+
+        const runtimeConfig = store.getConfigValues([
+            'allowedUserIds',
+            'defaultUserDailyBudgetUsd',
+        ]);
+        expect(runtimeConfig.allowedUserIds).toEqual(['user-1', 'user-2']);
+        expect(runtimeConfig.defaultUserDailyBudgetUsd).toBe(0);
+        store.close();
+    });
+
+    it('should support direct user budget operations', async () => {
+        const { ConfigStore } = await importStoreModule();
+        const store = new ConfigStore({ dbPath, autoImportLegacyJson: false });
+
+        expect(store.getUserBudget('user-1')).toBeNull();
+
+        store.setUserBudget('user-1', 1.25);
+        expect(store.getUserBudget('user-1')).toEqual({ dailyBudgetUsd: 1.25 });
+        expect(store.get('userBudgets')).toEqual({ 'user-1': { dailyBudgetUsd: 1.25 } });
+
+        expect(store.clearUserBudget('user-1')).toBe(true);
+        expect(store.getUserBudget('user-1')).toBeNull();
+        expect(store.clearUserBudget('user-1')).toBe(false);
+        store.close();
+    });
+
+    it('should support per-user usage persistence', async () => {
+        const { ConfigStore } = await importStoreModule();
+        const store = new ConfigStore({ dbPath, autoImportLegacyJson: false });
+        const usage = {
+            date: '2026-06-01',
+            inputTokens: 10,
+            outputTokens: 5,
+            requests: 1,
+        };
+
+        store.saveUserDailyUsage('user-1', usage);
+        expect(store.getUserDailyUsage('user-1')).toEqual(usage);
+        expect(store.get('userTokenUsage')).toEqual({ 'user-1': usage });
+
+        store.saveUserUsageHistory('user-1', [usage]);
+        expect(store.getUserUsageHistory('user-1')).toEqual([usage]);
+        expect(store.get('userUsageHistory')).toEqual({ 'user-1': [usage] });
+        expect(store.getUserDailyUsage('user-2')).toBeNull();
+        expect(store.getUserUsageHistory('user-2')).toEqual([]);
+        store.close();
+    });
+
     it('should import legacy JSON data into a fresh SQLite database', async () => {
         writeFileSync(
             legacyConfigPath,

@@ -1,11 +1,11 @@
-# Babel Alerts Runbook
+# Babel Pocket Alerts Runbook
 
-This runbook covers the 0.1.0 operations surface: health endpoints, Prometheus metrics, provider fallback signals, runtime queue pressure, budget blocks, and dashboard session control.
+This runbook covers the operations surface: health endpoints, Prometheus metrics, provider fallback signals, runtime queue pressure, budget blocks, and dashboard session control.
 
 ## Signals
 
 | Signal | Endpoint / Metric | Page When |
-|---|---|---|
+| --- | --- | --- |
 | Process down | `GET /livez` | Returns non-200 or times out for 2 minutes |
 | Not ready | `GET /readyz` | Returns non-200 for 5 minutes |
 | Degraded | `GET /healthz` | `status` is `degraded` for 10 minutes |
@@ -26,7 +26,7 @@ increase(babel_provider_requests_total{result="failure"}[5m]) > 3
 increase(babel_provider_fallback_total[10m]) > 2
 ```
 
-Tune thresholds to each server's normal traffic. Small instances should alert on queue pressure earlier because retries run inside acquired runtime permits.
+Tune thresholds to your instance's normal traffic. Small friend-share installs should alert on queue pressure early because retries run inside acquired runtime permits.
 
 ## Triage Flow
 
@@ -34,19 +34,19 @@ Tune thresholds to each server's normal traffic. Small instances should alert on
 2. Open the dashboard Overview tab and read the Operations guidance rows.
 3. If provider errors are present, check provider mode, credentials, model names, and recent error logs.
 4. If queue pressure is present, inspect runtime limits in Settings and recent traffic volume.
-5. If budget blocks are present, inspect global and per-server budgets in Settings and Access.
+5. If budget blocks are present, inspect global and per-user budgets in Settings and Access.
 6. If stale admin sessions are suspected, revoke them from Settings > Dashboard Sessions.
 7. Check deployment logs for uncaught errors or repeated restart loops.
 
 ## Common Responses
 
 | Symptom | Likely Cause | Response |
-|---|---|---|
+| --- | --- | --- |
 | `/livez` fails | Process crash, SQLite unavailable, config repository failure | Restart the service, then inspect logs and database path permissions |
 | `/readyz` fails but `/livez` passes | Setup incomplete or enabled provider health probe fails | Complete provider config or switch to a healthy fallback provider |
 | Provider auth errors | Expired or wrong API key, wrong GCP project, revoked credential | Rotate credentials and test from dashboard Translation Test |
 | Queue rejections | Traffic burst, provider slowdown, limits too tight | Raise queue/concurrency carefully, or lower Discord usage temporarily |
-| Budget blocks | Daily budget reached or estimate guard would overspend | Raise budget or wait for the daily reset |
+| Budget blocks | Daily budget reached or estimate guard would overspend | Raise the affected user budget or wait for the daily reset |
 | Cache hit rate collapses after deploy | Prompt/model/output-token config changed | Expected after cache-key version changes; monitor provider traffic |
 
 ## Release Checks

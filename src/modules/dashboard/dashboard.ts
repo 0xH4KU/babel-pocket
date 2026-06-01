@@ -20,6 +20,7 @@ import { checkVertexAiHealth } from '../../infra/vertex-ai-client.js';
 import { checkOpenAiHealth } from '../../infra/openai-client.js';
 import { configRepository } from '../config/config-repository.js';
 import { guildBudgetRepository } from '../usage/guild-budget-repository.js';
+import { userBudgetRepository } from '../usage/user-budget-repository.js';
 import { userPreferenceRepository } from '../translation/user-preference-repository.js';
 import { guildGlossaryRepository } from '../translation/guild-glossary-repository.js';
 import { applyConfigUpdateEffects } from '../config/config-runtime-effects.js';
@@ -68,8 +69,8 @@ function providerModeIncludes(
     return mode.split('+').includes(provider);
 }
 
-function budgetRiskForGuilds(
-    guildBudgetList: Array<{
+function budgetRiskForUsers(
+    budgetList: Array<{
         id: string;
         name: string;
         budget: number;
@@ -85,21 +86,21 @@ function budgetRiskForGuilds(
     const warnings: BudgetRiskItem[] = [];
     const exceeded: BudgetRiskItem[] = [];
 
-    for (const guildBudget of guildBudgetList) {
-        if (guildBudget.budget <= 0) {
+    for (const budgetItem of budgetList) {
+        if (budgetItem.budget <= 0) {
             continue;
         }
 
-        const usedPercent = guildBudget.totalCost / guildBudget.budget;
+        const usedPercent = budgetItem.totalCost / budgetItem.budget;
         const item = {
-            id: guildBudget.id,
-            name: guildBudget.name,
-            budget: guildBudget.budget,
-            totalCost: guildBudget.totalCost,
+            id: budgetItem.id,
+            name: budgetItem.name,
+            budget: budgetItem.budget,
+            totalCost: budgetItem.totalCost,
             usedPercent,
         };
 
-        if (guildBudget.exceeded) {
+        if (budgetItem.exceeded) {
             exceeded.push(item);
         } else if (usedPercent >= BUDGET_WARNING_THRESHOLD) {
             warnings.push(item);
@@ -180,15 +181,15 @@ function buildOperationsGuidance({
         guidance.push({
             area: 'budget',
             severity: 'critical',
-            title: 'Server budget exceeded',
-            action: 'Raise the affected server budget or wait for the daily reset.',
+            title: 'User budget exceeded',
+            action: 'Raise the affected user budget or wait for the daily reset.',
         });
     } else if (budgetRisk.warningCount > 0) {
         guidance.push({
             area: 'budget',
             severity: 'warning',
-            title: 'Server budget nearing limit',
-            action: 'Review per-server usage and adjust budgets before translations are blocked.',
+            title: 'User budget nearing limit',
+            action: 'Review per-user usage and adjust budgets before translations are blocked.',
         });
     }
 
@@ -417,6 +418,9 @@ function validateConfigUpdate(updates: Record<string, unknown>): {
     delete sanitized.guildBudgets;
     delete sanitized.guildTokenUsage;
     delete sanitized.guildUsageHistory;
+    delete sanitized.userBudgets;
+    delete sanitized.userTokenUsage;
+    delete sanitized.userUsageHistory;
 
     if (sanitized.cooldownSeconds !== undefined) {
         const v = parseInt(String(sanitized.cooldownSeconds));
@@ -472,6 +476,17 @@ function validateConfigUpdate(updates: Record<string, unknown>): {
             };
         }
         sanitized.dailyBudgetUsd = v;
+    }
+    if (sanitized.defaultUserDailyBudgetUsd !== undefined) {
+        const v = parseFloat(String(sanitized.defaultUserDailyBudgetUsd));
+        if (isNaN(v) || v < 0) {
+            return {
+                valid: false,
+                error: dashboardMessages.validation.dailyBudgetUsd,
+                sanitized: sanitized as Partial<StoreData>,
+            };
+        }
+        sanitized.defaultUserDailyBudgetUsd = v;
     }
     for (const key of [
         'translationMaxConcurrent',
@@ -748,27 +763,25 @@ export function createDashboardApp({
         const runtimeConfig = configRepository.getRuntimeConfig();
         const providerMode = runtimeConfig.translationProvider || 'vertex';
 
-        const guildIds = client.guilds.cache.map((guild) => guild.id);
-        const guildBudgetConfigs = guildBudgetRepository.listBudgets();
-        const guildStatsById = guildIds.length > 0 ? usage.getGuildStatsForGuilds(guildIds) : {};
-        const guildBudgetList = client.guilds.cache.map((guild) => {
-            const guildCfg = guildBudgetConfigs[guild.id];
-            const hasCustom = Boolean(guildCfg && guildCfg.dailyBudgetUsd !== undefined);
-            const guildStats = guildStatsById[guild.id];
-            const scopedStats = hasCustom ? guildStats : usageStats;
+        const userBudgetConfigs = userBudgetRepository.listBudgets();
+        const userIds = [
+            ...new Set([...runtimeConfig.allowedUserIds, ...Object.keys(userBudgetConfigs)]),
+        ];
+        const userBudgetList = userIds.map((userId) => {
+            const userCfg = userBudgetConfigs[userId];
+            const hasCustom = Boolean(userCfg && userCfg.dailyBudgetUsd !== undefined);
+            const userStats = usage.getUserStats(userId);
             const budget = hasCustom
-                ? (guildCfg?.dailyBudgetUsd ?? 0)
-                : (scopedStats?.dailyBudget ?? usageStats.dailyBudget);
-            const totalCost = scopedStats?.totalCost ?? 0;
-            const requests = scopedStats?.requests ?? 0;
+                ? (userCfg?.dailyBudgetUsd ?? 0)
+                : runtimeConfig.defaultUserDailyBudgetUsd || 0;
             return {
-                id: guild.id,
-                name: guild.name,
+                id: userId,
+                name: userId,
                 budget,
                 isCustom: hasCustom,
-                totalCost,
-                requests,
-                exceeded: budget > 0 && totalCost >= budget,
+                totalCost: userStats.totalCost,
+                requests: userStats.requests,
+                exceeded: budget > 0 && userStats.totalCost >= budget,
             };
         });
         const vertexEnabled = providerModeIncludes(providerMode, 'vertex');
@@ -794,7 +807,7 @@ export function createDashboardApp({
             rejectionCounts: runtimeSnapshot.rejectionCounts,
             limits: runtimeSnapshot.limits,
         };
-        const budgetRisk = budgetRiskForGuilds(guildBudgetList);
+        const budgetRisk = budgetRiskForUsers(userBudgetList);
         const operations = {
             providerMode,
             providers,
@@ -838,7 +851,8 @@ export function createDashboardApp({
             operations,
             cache: cacheStats,
             usage: usageStats,
-            guildBudgets: guildBudgetList,
+            userBudgets: userBudgetList,
+            guildBudgets: userBudgetList,
             errors: log.errorCount,
         });
     });
@@ -936,6 +950,59 @@ export function createDashboardApp({
             }
 
             guildBudgetRepository.setBudget(guildId, v);
+            res.json({ ok: true, budget: v });
+        },
+    );
+
+    app.get('/api/user-budgets', auth.requireAuth, (_req: Request, res: Response) => {
+        const userBudgets = userBudgetRepository.listBudgets();
+        const cfg = configRepository.getDashboardConfig();
+        const result: Record<string, { budget: number; isCustom: boolean }> = {};
+
+        for (const userId of cfg.allowedUserIds) {
+            const customBudget = userBudgets[userId];
+            result[userId] = {
+                budget: customBudget?.dailyBudgetUsd ?? cfg.defaultUserDailyBudgetUsd,
+                isCustom: customBudget !== undefined,
+            };
+        }
+
+        for (const [userId, customBudget] of Object.entries(userBudgets)) {
+            result[userId] ??= {
+                budget: customBudget.dailyBudgetUsd,
+                isCustom: true,
+            };
+        }
+
+        res.json(result);
+    });
+
+    app.post(
+        '/api/user-budgets/:userId',
+        auth.requireAuth,
+        auth.requireCsrf,
+        (req: Request, res: Response) => {
+            const userId = String(req.params.userId ?? '').trim();
+            const { dailyBudgetUsd } = req.body;
+
+            if (!userId) {
+                res.status(400).json({ error: 'User id is required' });
+                return;
+            }
+
+            if (dailyBudgetUsd === null || dailyBudgetUsd === undefined) {
+                userBudgetRepository.clearBudget(userId);
+                res.json({ ok: true, mode: 'default' });
+                return;
+            }
+
+            const v = parseFloat(String(dailyBudgetUsd));
+            if (isNaN(v) || v < 0) {
+                res.status(400).json({ error: dashboardMessages.validation.dailyBudgetUsd });
+                return;
+            }
+
+            userBudgetRepository.setBudget(userId, v);
             res.json({ ok: true, budget: v });
         },
     );

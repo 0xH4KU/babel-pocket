@@ -9,13 +9,11 @@ import { configRepository } from './modules/config/config-repository.js';
 import { createGracefulShutdownHandler } from './shared/shutdown.js';
 import { createTranslationService } from './modules/translation/translation-service.js';
 import { handleBabel } from './commands/babel.js';
-import { handleTranslate } from './commands/translate.js';
 import { handleSetlang, handleMylang } from './commands/setlang.js';
 import { handleHelp } from './commands/help.js';
 import { closeSqliteDatabase } from './persistence/sqlite-database.js';
 import { appLogger } from './shared/structured-logger.js';
 import { TranslationRuntimeLimiter } from './modules/translation/translation-runtime-limiter.js';
-import { createWebhookService } from './modules/translation/webhook-service.js';
 import type { BotStats } from './types.js';
 import type express from 'express';
 import type http from 'http';
@@ -71,7 +69,6 @@ const translationService = createTranslationService({
     metrics,
     runtimeLimiter,
 });
-const webhookService = createWebhookService({ metrics });
 
 startupLogger.info('translation.runtime_limits.configured', {
     runtime: runtimeLimiter.snapshot(),
@@ -111,8 +108,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
         switch (interaction.commandName) {
             case 'setlang':
                 return handleSetlang(interaction);
-            case 'translate':
-                return handleTranslate(interaction, { translationService, webhookService });
             case 'help':
                 return handleHelp(interaction);
             case 'mylang':
@@ -120,7 +115,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
         }
     }
 
-    if (interaction.isMessageContextMenuCommand() && interaction.commandName === 'Babel') {
+    if (interaction.isMessageContextMenuCommand() && interaction.commandName === 'Babel Pocket') {
         return handleBabel(interaction, { translationService });
     }
 });

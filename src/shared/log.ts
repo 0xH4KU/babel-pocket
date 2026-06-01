@@ -33,7 +33,7 @@ export class TranslationLog {
         this.pushEntry({
             type: 'translation',
             guildId: params.guildId ?? null,
-            guildName: params.guildName || params.guildId || 'Unknown',
+            guildName: params.guildName || params.guildId || 'Private',
             userId: params.userId,
             userTag: params.userTag || params.userId,
             contentPreview: params.contentPreview?.slice(0, 50) || '',
@@ -62,7 +62,7 @@ export class TranslationLog {
         this.pushEntry({
             type: 'error',
             guildId: params.guildId ?? null,
-            guildName: params.guildName || params.guildId || 'Unknown',
+            guildName: params.guildName || params.guildId || 'Private',
             userId: params.userId || 'Unknown',
             userTag: params.userTag || params.userId || 'Unknown',
             error: String(params.error).slice(0, 200),

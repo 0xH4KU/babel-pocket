@@ -1,8 +1,8 @@
-# Docker Deployment and Operations
+# Docker Deployment And Operations
 
-This guide is for server owners who want to run Babel as their own self-hosted Discord translation bot. You provide the Discord bot token, dashboard password, hosting, and AI provider key. Babel does not require a hosted bot subscription.
+This guide is for running Babel Pocket as your own self-hosted Discord user-install translator. You provide the Discord bot token, dashboard password, hosting, and AI provider key. Whitelisted Discord users can install the app to their own account and use the **Babel Pocket** right-click command.
 
-## Install Docker on Ubuntu 24.04 ARM
+## Install Docker On Ubuntu 24.04 ARM
 
 Update the host and install curl:
 
@@ -55,14 +55,14 @@ docker compose up -d --build
 Or build and run manually:
 
 ```bash
-docker build -t babel-bot .
+docker build -t babel-pocket .
 docker run -d \
-  --name babel-translator \
+  --name babel-pocket \
   --restart unless-stopped \
   -p 3000:3000 \
   --env-file .env \
-  -v babel_data:/app/data \
-  babel-bot
+  -v babel_pocket_data:/app/data \
+  babel-pocket
 ```
 
 Verify the container:
@@ -72,16 +72,16 @@ curl -fsS http://localhost:3000/livez
 curl -fsS http://localhost:3000/readyz
 ```
 
-Open `http://localhost:3000`, log in with `DASHBOARD_PASSWORD`, and complete the setup wizard.
+Open `http://localhost:3000`, log in with `DASHBOARD_PASSWORD`, complete the setup wizard, add allowed Discord user IDs, and configure default/custom user budgets.
 
-## Updating Babel
+## Updating Babel Pocket
 
 Back up the SQLite database first:
 
 ```bash
 mkdir -p backups
-docker exec babel-translator sh -lc "sqlite3 /app/data/babel.sqlite \".backup '/app/data/babel-backup.sqlite'\"" || true
-docker cp babel-translator:/app/data/babel-backup.sqlite ./backups/babel-$(date +%Y%m%d-%H%M%S).sqlite || true
+docker exec babel-pocket sh -lc "sqlite3 /app/data/babel.sqlite \".backup '/app/data/babel-pocket-backup.sqlite'\"" || true
+docker cp babel-pocket:/app/data/babel-pocket-backup.sqlite ./backups/babel-pocket-$(date +%Y%m%d-%H%M%S).sqlite || true
 ```
 
 Then update:
@@ -96,16 +96,16 @@ For manual Docker runs:
 
 ```bash
 git pull
-docker build -t babel-bot .
-docker stop babel-translator
-docker rm babel-translator
+docker build -t babel-pocket .
+docker stop babel-pocket
+docker rm babel-pocket
 docker run -d \
-  --name babel-translator \
+  --name babel-pocket \
   --restart unless-stopped \
   -p 3000:3000 \
   --env-file .env \
-  -v babel_data:/app/data \
-  babel-bot
+  -v babel_pocket_data:/app/data \
+  babel-pocket
 docker image prune -f
 ```
 
@@ -114,7 +114,7 @@ Verify after updating:
 ```bash
 curl -fsS http://localhost:3000/livez
 curl -fsS http://localhost:3000/readyz
-docker logs --tail 100 babel-translator
+docker logs --tail 100 babel-pocket
 ```
 
 ## Common Operations
@@ -122,41 +122,41 @@ docker logs --tail 100 babel-translator
 View logs:
 
 ```bash
-docker logs -f babel-translator
+docker logs -f babel-pocket
 ```
 
 Restart:
 
 ```bash
-docker restart babel-translator
+docker restart babel-pocket
 ```
 
 Open a shell:
 
 ```bash
-docker exec -it babel-translator sh
+docker exec -it babel-pocket sh
 ```
 
 Stop and remove the container:
 
 ```bash
-docker stop babel-translator
-docker rm babel-translator
+docker stop babel-pocket
+docker rm babel-pocket
 ```
 
 Remove the image:
 
 ```bash
-docker rmi babel-bot
+docker rmi babel-pocket
 ```
 
-Remove the data volume only when you intentionally want to delete all persisted config and usage data:
+Remove the data volume only when you intentionally want to delete all persisted config, user whitelist, budgets, and usage data:
 
 ```bash
-docker volume rm babel_data
+docker volume rm babel_pocket_data
 ```
 
-## Migrating Servers
+## Migrating Hosts
 
 Back up `.env` securely. It contains your Discord token and dashboard settings.
 
@@ -164,28 +164,28 @@ Create a SQLite backup from the old host:
 
 ```bash
 mkdir -p backups
-docker exec babel-translator sh -lc "sqlite3 /app/data/babel.sqlite \".backup '/app/data/babel-backup.sqlite'\""
-docker cp babel-translator:/app/data/babel-backup.sqlite ./backups/babel.sqlite
+docker exec babel-pocket sh -lc "sqlite3 /app/data/babel.sqlite \".backup '/app/data/babel-pocket-backup.sqlite'\""
+docker cp babel-pocket:/app/data/babel-pocket-backup.sqlite ./backups/babel-pocket.sqlite
 ```
 
 Copy these files to the new host:
 
 - `.env`
-- `backups/babel.sqlite`
+- `backups/babel-pocket.sqlite`
 
 On the new host, restore into a bind mount:
 
 ```bash
-mkdir -p babel_data_backup
-cp backups/babel.sqlite babel_data_backup/babel.sqlite
-docker build -t babel-bot .
+mkdir -p babel_pocket_data_backup
+cp backups/babel-pocket.sqlite babel_pocket_data_backup/babel.sqlite
+docker build -t babel-pocket .
 docker run -d \
-  --name babel-translator \
+  --name babel-pocket \
   --restart unless-stopped \
   -p 3000:3000 \
   --env-file .env \
-  -v $(pwd)/babel_data_backup:/app/data \
-  babel-bot
+  -v $(pwd)/babel_pocket_data_backup:/app/data \
+  babel-pocket
 ```
 
 Then verify:

@@ -24,6 +24,10 @@ export interface GuildBudgetConfig {
     dailyBudgetUsd: number;
 }
 
+export interface UserBudgetConfig {
+    dailyBudgetUsd: number;
+}
+
 export interface GuildGlossaryEntry {
     id: number;
     guildId: string;
@@ -47,12 +51,14 @@ export interface StoreData {
     gcpLocation: string;
     geminiModel: string;
     allowedGuildIds: string[];
+    allowedUserIds: string[];
     cooldownSeconds: number;
     cacheMaxSize: number;
     setupComplete: boolean;
     inputPricePerMillion: number;
     outputPricePerMillion: number;
     dailyBudgetUsd: number;
+    defaultUserDailyBudgetUsd: number;
     tokenUsage: TokenUsage | null;
     usageHistory: UsageHistoryEntry[];
     translationPrompt: string;
@@ -73,6 +79,9 @@ export interface StoreData {
     guildBudgets: Record<string, GuildBudgetConfig>;
     guildTokenUsage: Record<string, TokenUsage>;
     guildUsageHistory: Record<string, UsageHistoryEntry[]>;
+    userBudgets: Record<string, UserBudgetConfig>;
+    userTokenUsage: Record<string, TokenUsage>;
+    userUsageHistory: Record<string, UsageHistoryEntry[]>;
 }
 
 export interface TokenUsage {

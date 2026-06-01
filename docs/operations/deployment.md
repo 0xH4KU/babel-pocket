@@ -1,51 +1,49 @@
-# Babel Deployment Guide
+# Babel Pocket Deployment Guide
 
-This guide covers common ways to run Babel as a self-hosted Discord translation bot. Babel does not proxy your traffic through a shared hosted bot: you provide the Discord bot token, dashboard password, hosting, and AI provider credentials.
+Babel Pocket is a self-hosted Discord translator for user-installed apps. You provide the Discord application, bot token, dashboard password, hosting, and AI provider credentials. Users install your app to their own Discord account and use **Babel Pocket** from the message right-click Apps menu.
 
-> Railway links may be affiliate or template links when provided. They help support Babel maintenance at no extra cost to you.
+This fork keeps the original Babel deployment shape, but access and budget decisions are user-scoped: user whitelist, default user budget, custom user budgets, and a global instance safety cap.
 
 ## Before You Deploy
 
 You need:
 
-- A Discord application with a bot token
+- A Discord application with **User Install** enabled
 - Node.js `22.5+` for local/VPS installs, or Docker for container installs
 - A dashboard password that is not `admin`
 - At least one configured translation provider in the dashboard after startup
 
-Babel does not require privileged Discord intents.
+Babel Pocket does not require privileged Discord intents.
 
 ## Discord Setup
 
 1. Open the [Discord Developer Portal](https://discord.com/developers/applications).
 2. Create an application.
-3. Open **Bot** and copy the bot token.
-4. Invite the bot with:
-
-```text
-https://discord.com/oauth2/authorize?client_id=YOUR_APP_ID&scope=bot+applications.commands
-```
-
-5. Register commands:
+3. Open **Installation** and enable **User Install**.
+4. In default User Install settings, include the `applications.commands` scope.
+5. Open **Bot** and copy the bot token.
+6. Register commands:
 
 ```bash
 DISCORD_APP_ID=your_app_id DISCORD_BOT_TOKEN=your_token npm run register
 ```
 
-This registers the `Babel` message context menu plus `/translate`, `/setlang`, `/mylang`, and `/help`.
+This registers the `Babel Pocket` message context menu plus `/setlang`, `/mylang`, and `/help`. It intentionally does not register `/translate`.
+
+The command payload uses `integration_types: [1]` for User Install and `contexts: [0, 1, 2]` for guild channels, bot DMs, and private channels. See Discord's application command context docs for the exact API fields.
 
 ## Railway
 
-Railway is a good fit for small communities that want a hosted self-deploy without managing a VPS. Babel supports Railway's `PORT` variable, binds the dashboard on `0.0.0.0` by default, and includes `railway.json` for the `/livez` healthcheck.
+Railway is a good fit for a small self-hosted instance shared with trusted users. Babel Pocket supports Railway's `PORT` variable, binds the dashboard on `0.0.0.0` by default, and includes `railway.json` for the `/livez` healthcheck.
 
 Recommended environment variables:
 
-| Variable             | Value                    |
-| -------------------- | ------------------------ |
-| `DISCORD_TOKEN`      | Your Discord bot token   |
+| Variable | Value |
+| --- | --- |
+| `DISCORD_TOKEN` | Your Discord bot token |
 | `DASHBOARD_PASSWORD` | A strong random password |
-| `BABEL_DB_PATH`      | `/app/data/babel.sqlite` |
-| `NODE_ENV`           | `production`             |
+| `BABEL_DB_PATH` | `/app/data/babel.sqlite` |
+| `NODE_ENV` | `production` |
 
 Use a persistent volume mounted at `/app/data` so SQLite survives restarts and redeploys. If the Railway volume is not writable by the Docker image's non-root user, set `RAILWAY_RUN_UID=0` on the service.
 
@@ -56,24 +54,24 @@ After deployment:
 3. Log in with `DASHBOARD_PASSWORD`.
 4. Complete the setup wizard and configure the provider.
 5. Register Discord commands from a local checkout or Railway shell with `npm run register`.
-6. Check `/livez`, `/readyz`, and the dashboard Operations panel.
+6. Add allowed Discord user IDs in the Access tab.
+7. Set the default user daily budget and any custom user budgets.
+8. Check `/livez`, `/readyz`, and the dashboard Operations panel.
 
-For the one-click template checklist, persistent volume notes, and affiliate disclosure wording, see [Railway deployment](railway.md).
-
-Railway autodeploys apply to services connected directly to a GitHub repository and branch. Services created from the Babel template should be treated as self-hosted installs: review upstream changes, back up the SQLite volume, then apply the template update or redeploy intentionally. Babel's dashboard version badge checks GitHub releases hourly; use the refresh button beside the badge for an immediate update check.
+For persistent volume notes and the Railway checklist, see [Railway deployment](railway.md).
 
 ## Docker / VPS
 
 Build and run:
 
 ```bash
-docker build -t babel .
+docker build -t babel-pocket .
 docker run -d \
-  --name babel \
+  --name babel-pocket \
   --env-file .env \
   -p 3000:3000 \
-  -v babel-data:/app/data \
-  babel
+  -v babel-pocket-data:/app/data \
+  babel-pocket
 ```
 
 Example `.env`:
@@ -94,7 +92,7 @@ curl -fsS http://localhost:3000/livez
 curl -fsS http://localhost:3000/readyz
 ```
 
-For Docker Compose, update, cleanup, backup, and server migration commands, see [Docker deployment and operations](docker.md).
+For Docker Compose, update, cleanup, backup, and host migration commands, see [Docker deployment and operations](docker.md).
 
 ## PM2
 
@@ -137,10 +135,11 @@ In the dashboard, check:
 - Runtime queue pressure
 - Budget risk
 - Translation test
-- Server whitelist
+- User whitelist
+- Default and custom user budgets
 
 ## Support
 
-Babel is free and self-hosted. If it saves setup time or helps your community avoid a hosted bot subscription, you can support upstream maintenance on Ko-fi:
+Babel Pocket is free and self-hosted. If it saves setup time or helps you share a private translator with friends, you can support upstream maintenance on Ko-fi:
 
 [![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/0xh4ku)

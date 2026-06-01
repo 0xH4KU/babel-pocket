@@ -499,7 +499,7 @@
   border-color: var(--red);
 }
 
-/* --- Per-Server Budget Overview Items --- */
+/* --- Per-User Budget Overview Items --- */
 .guild-budget-overview-item {
   display: flex;
   align-items: center;

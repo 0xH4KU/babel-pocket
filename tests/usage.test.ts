@@ -32,6 +32,20 @@ vi.mock('../src/store.js', () => ({
             delete budgets[guildId];
             return true;
         }),
+        getUserBudget: vi.fn((userId: string) => {
+            const budgets = mockData.userBudgets as Record<string, unknown>;
+            return budgets[userId] ?? null;
+        }),
+        setUserBudget: vi.fn((userId: string, dailyBudgetUsd: number) => {
+            const budgets = mockData.userBudgets as Record<string, unknown>;
+            budgets[userId] = { dailyBudgetUsd };
+        }),
+        clearUserBudget: vi.fn((userId: string) => {
+            const budgets = mockData.userBudgets as Record<string, unknown>;
+            if (!(userId in budgets)) return false;
+            delete budgets[userId];
+            return true;
+        }),
         getGuildDailyUsage: vi.fn((guildId: string) => {
             const usage = mockData.guildTokenUsage as Record<string, unknown>;
             return usage[guildId] ?? null;
@@ -47,6 +61,22 @@ vi.mock('../src/store.js', () => ({
         saveGuildUsageHistory: vi.fn((guildId: string, history: unknown) => {
             const allHistory = mockData.guildUsageHistory as Record<string, unknown>;
             allHistory[guildId] = history;
+        }),
+        getUserDailyUsage: vi.fn((userId: string) => {
+            const usage = mockData.userTokenUsage as Record<string, unknown>;
+            return usage[userId] ?? null;
+        }),
+        saveUserDailyUsage: vi.fn((userId: string, usage: unknown) => {
+            const allUsage = mockData.userTokenUsage as Record<string, unknown>;
+            allUsage[userId] = usage;
+        }),
+        getUserUsageHistory: vi.fn((userId: string) => {
+            const history = mockData.userUsageHistory as Record<string, unknown>;
+            return history[userId] ?? [];
+        }),
+        saveUserUsageHistory: vi.fn((userId: string, history: unknown) => {
+            const allHistory = mockData.userUsageHistory as Record<string, unknown>;
+            allHistory[userId] = history;
         }),
     },
 }));
@@ -68,7 +98,9 @@ describe('UsageTracker', () => {
         mockData.inputPricePerMillion = 0;
         mockData.outputPricePerMillion = 0;
         mockData.dailyBudgetUsd = 0;
+        mockData.defaultUserDailyBudgetUsd = 0;
         mockData.allowedGuildIds = [];
+        mockData.allowedUserIds = [];
         mockData.cooldownSeconds = 5;
         mockData.cacheMaxSize = 2000;
         mockData.setupComplete = true;
@@ -83,6 +115,9 @@ describe('UsageTracker', () => {
         mockData.guildBudgets = {};
         mockData.guildTokenUsage = {};
         mockData.guildUsageHistory = {};
+        mockData.userBudgets = {};
+        mockData.userTokenUsage = {};
+        mockData.userUsageHistory = {};
 
         mockedStore.getAll.mockClear();
         mockedStore.getConfigValues.mockClear();
@@ -507,6 +542,44 @@ describe('UsageTracker', () => {
                     guildId: 'guild-estimate',
                 }),
             ).toBe(true);
+        });
+    });
+
+    describe('Per-User Budget', () => {
+        it('should record both global and user usage', () => {
+            usage.record(100, 50, { userId: 'user-1' });
+
+            const global = mockData.tokenUsage as { inputTokens: number; requests: number };
+            expect(global.inputTokens).toBe(100);
+            expect(global.requests).toBe(1);
+
+            const userUsage = mockData.userTokenUsage as Record<
+                string,
+                { inputTokens: number; outputTokens: number; requests: number }
+            >;
+            expect(userUsage['user-1'].inputTokens).toBe(100);
+            expect(userUsage['user-1'].outputTokens).toBe(50);
+            expect(userUsage['user-1'].requests).toBe(1);
+        });
+
+        it('should block requests when the user budget is exceeded', () => {
+            mockData.userBudgets = { 'user-1': { dailyBudgetUsd: 1.0 } };
+            mockData.inputPricePerMillion = 1.0;
+            mockData.outputPricePerMillion = 0;
+
+            usage.record(1_000_000, 0, { userId: 'user-1' });
+
+            expect(usage.isBudgetExceeded({ userId: 'user-1' })).toBe(true);
+        });
+
+        it('should use the default user budget when no custom user budget exists', () => {
+            mockData.defaultUserDailyBudgetUsd = 1.0;
+            mockData.inputPricePerMillion = 1.0;
+            mockData.outputPricePerMillion = 0;
+
+            usage.record(1_000_000, 0, { userId: 'user-2' });
+
+            expect(usage.isBudgetExceeded({ userId: 'user-2' })).toBe(true);
         });
     });
 });

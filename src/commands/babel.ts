@@ -15,6 +15,10 @@ async function editReplyWithChunks(
     }
 }
 
+function getUserInstallOwnerId(interaction: MessageContextMenuCommandInteraction): string {
+    return interaction.authorizingIntegrationOwners?.['1'] ?? interaction.user.id;
+}
+
 /**
  * Handle Babel context menu command — translate a right-clicked message.
  */
@@ -25,10 +29,11 @@ export async function handleBabel(
     const requestId = createRequestId();
     const result = await translationService.process({
         command: 'babel',
-        commandLabel: 'Babel (context menu)',
+        commandLabel: 'Babel Pocket (context menu)',
         guildId: interaction.guildId,
         guildName: interaction.guild?.name,
         userId: interaction.user.id,
+        billingUserId: getUserInstallOwnerId(interaction),
         userTag: interaction.user.tag,
         locale: interaction.locale,
         text: extractTranslatableMessageText(interaction.targetMessage),

@@ -1,6 +1,6 @@
 {
   "bot": {
-    "name": "Babel Demo#0110",
+    "name": "Babel Pocket Demo#0110",
     "avatar": "data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2264%22 height=%2264%22 viewBox=%220 0 64 64%22%3E%3Crect width=%2264%22 height=%2264%22 rx=%2218%22 fill=%22%235865f2%22/%3E%3Ctext x=%2232%22 y=%2240%22 text-anchor=%22middle%22 font-family=%22Arial%22 font-size=%2228%22 font-weight=%22700%22 fill=%22white%22%3EB%3C/text%3E%3C/svg%3E",
     "uptime": 342720,
     "memoryMB": "86.3",
@@ -9,7 +9,7 @@
       "heapUsedMB": "33.1",
       "externalMB": "4.6"
     },
-    "guilds": 4
+    "guilds": 0
   },
   "translations": {
     "total": 1284,
@@ -105,8 +105,8 @@
       "exceededCount": 0,
       "warnings": [
         {
-          "id": "100000000000000001",
-          "name": "Builder Lounge",
+          "id": "200000000000000001",
+          "name": "200000000000000001",
           "budget": 1.25,
           "totalCost": 1.07,
           "usedPercent": 0.856
@@ -118,8 +118,8 @@
       {
         "area": "budget",
         "severity": "warning",
-        "title": "Server budget nearing limit",
-        "action": "Review per-server usage and adjust budgets before translations are blocked."
+        "title": "User budget nearing limit",
+        "action": "Review per-user usage and adjust budgets before translations are blocked."
       },
       {
         "area": "provider",
@@ -147,10 +147,10 @@
     "budgetUsedPercent": 10.69,
     "budgetExceeded": false
   },
-  "guildBudgets": [
+  "userBudgets": [
     {
-      "id": "100000000000000001",
-      "name": "Builder Lounge",
+      "id": "200000000000000001",
+      "name": "200000000000000001",
       "budget": 1.25,
       "isCustom": true,
       "totalCost": 1.07,
@@ -158,8 +158,8 @@
       "exceeded": false
     },
     {
-      "id": "100000000000000002",
-      "name": "Indie Game Dev",
+      "id": "200000000000000002",
+      "name": "200000000000000002",
       "budget": 0.75,
       "isCustom": false,
       "totalCost": 0.28,
@@ -167,8 +167,8 @@
       "exceeded": false
     },
     {
-      "id": "100000000000000003",
-      "name": "Open Source Asia",
+      "id": "200000000000000004",
+      "name": "200000000000000004",
       "budget": 0,
       "isCustom": true,
       "totalCost": 0.15,
@@ -176,5 +176,6 @@
       "exceeded": false
     }
   ],
+  "guildBudgets": [],
   "errors": 9
 }

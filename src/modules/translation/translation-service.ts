@@ -53,13 +53,18 @@ interface GlossaryRepositoryLike {
 }
 
 interface UsageLike {
-    isBudgetExceeded(guildId?: string | null): boolean;
+    isBudgetExceeded(scope?: { guildId?: string | null; userId?: string | null }): boolean;
     wouldExceedBudget?(estimate: {
         estimatedInputTokens: number;
         estimatedOutputTokens: number;
         guildId?: string | null;
+        userId?: string | null;
     }): boolean;
-    record(inputTokens: number, outputTokens: number, guildId?: string | null): void;
+    record(
+        inputTokens: number,
+        outputTokens: number,
+        scope?: { guildId?: string | null; userId?: string | null },
+    ): void;
 }
 
 interface Translator {
@@ -76,6 +81,7 @@ export interface TranslationServiceRequest {
     guildId?: string | null;
     guildName?: string;
     userId: string;
+    billingUserId?: string | null;
     userTag: string;
     locale?: string;
     text: string;
@@ -251,15 +257,29 @@ export function createTranslationService({
             }
 
             const runtimeConfig = configStore.getRuntimeConfig();
-            const allowedGuilds = runtimeConfig.allowedGuildIds;
-            if (!request.guildId || !allowedGuilds.includes(request.guildId)) {
+            const billingUserId = request.billingUserId ?? null;
+            const isGuildAllowed =
+                !!request.guildId && runtimeConfig.allowedGuildIds.includes(request.guildId);
+            const isUserAllowed =
+                !!billingUserId && runtimeConfig.allowedUserIds.includes(billingUserId);
+            if (!isGuildAllowed && !isUserAllowed) {
                 requestLogger.warn('translation.request.blocked', {
-                    blockReason: 'guild_not_allowed',
+                    blockReason: billingUserId ? 'user_not_allowed' : 'guild_not_allowed',
                 });
-                return { status: 'blocked', message: discordMessages.unauthorizedGuild() };
+                return {
+                    status: 'blocked',
+                    message: billingUserId
+                        ? discordMessages.unauthorizedUser()
+                        : discordMessages.unauthorizedGuild(),
+                };
             }
 
-            if (usageTracker.isBudgetExceeded(request.guildId)) {
+            const usageScope = {
+                guildId: request.guildId ?? null,
+                userId: billingUserId,
+            };
+
+            if (usageTracker.isBudgetExceeded(usageScope)) {
                 metrics?.recordBudgetExceeded();
                 requestLogger.warn('translation.request.blocked', {
                     blockReason: 'budget_exceeded',
@@ -302,7 +322,7 @@ export function createTranslationService({
                 usageTracker.wouldExceedBudget?.({
                     estimatedInputTokens: Math.ceil(originalText.length / 4),
                     estimatedOutputTokens: runtimeConfig.maxOutputTokens || 1000,
-                    guildId: request.guildId,
+                    ...usageScope,
                 })
             ) {
                 metrics?.recordBudgetExceeded();
@@ -357,7 +377,7 @@ export function createTranslationService({
                 if (!cached && runtimeLimiter) {
                     const admission = runtimeLimiter.acquire({
                         guildId: request.guildId ?? null,
-                        userId: request.userId,
+                        userId: billingUserId ?? request.userId,
                     });
 
                     if (!admission.accepted) {
@@ -421,7 +441,7 @@ export function createTranslationService({
                                     {
                                         requestId,
                                         guildId: request.guildId ?? null,
-                                        userId: request.userId,
+                                        userId: billingUserId ?? request.userId,
                                         command: request.command,
                                     },
                                     metrics,
@@ -436,7 +456,7 @@ export function createTranslationService({
                             usageTracker.record(
                                 result.inputTokens,
                                 result.outputTokens,
-                                request.guildId,
+                                usageScope,
                             );
                             return result.text;
                         });
@@ -450,7 +470,7 @@ export function createTranslationService({
                                 {
                                     requestId,
                                     guildId: request.guildId ?? null,
-                                    userId: request.userId,
+                                    userId: billingUserId ?? request.userId,
                                     command: request.command,
                                 },
                                 metrics,
@@ -463,11 +483,7 @@ export function createTranslationService({
                         provider = result.provider;
                         fallback = result.fallback;
                         cache.set(cacheKey, translated);
-                        usageTracker.record(
-                            result.inputTokens,
-                            result.outputTokens,
-                            request.guildId,
-                        );
+                        usageTracker.record(result.inputTokens, result.outputTokens, usageScope);
                     }
                 }
 

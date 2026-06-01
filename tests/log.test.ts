@@ -226,7 +226,7 @@ describe('TranslationLog', () => {
         log.addError({ error: 'oops' });
 
         const entry = log.getRecent(1)[0] as ErrorLogEntry;
-        expect(entry.guildName).toBe('Unknown');
+        expect(entry.guildName).toBe('Private');
         expect(entry.userTag).toBe('Unknown');
         expect(entry.command).toBe('unknown');
     });

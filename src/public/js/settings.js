@@ -55,9 +55,8 @@ async function loadSessions() {
 
 async function loadSettings() {
   try {
-    const [cfgRes, guildRes] = await Promise.all([api('/config'), api('/guilds')]);
+    const cfgRes = await api('/config');
     currentConfig = await cfgRes.json();
-    allGuilds = await guildRes.json();
 
     document.getElementById('cfg-apikey').value = '';
     document.getElementById('cfg-apikey').placeholder =
@@ -72,6 +71,7 @@ async function loadSettings() {
     document.getElementById('cfg-input-price').value = currentConfig.inputPricePerMillion || 0;
     document.getElementById('cfg-output-price').value = currentConfig.outputPricePerMillion || 0;
     document.getElementById('cfg-budget').value = currentConfig.dailyBudgetUsd || 0;
+    document.getElementById('cfg-user-budget').value = currentConfig.defaultUserDailyBudgetUsd || 0;
     document.getElementById('cfg-prompt').value = currentConfig.translationPrompt || '';
 
     // Provider settings
@@ -102,6 +102,7 @@ async function saveSettings() {
   updates.inputPricePerMillion = parseFloat(document.getElementById('cfg-input-price').value) || 0;
   updates.outputPricePerMillion = parseFloat(document.getElementById('cfg-output-price').value) || 0;
   updates.dailyBudgetUsd = parseFloat(document.getElementById('cfg-budget').value) || 0;
+  updates.defaultUserDailyBudgetUsd = parseFloat(document.getElementById('cfg-user-budget').value) || 0;
   updates.translationPrompt = document.getElementById('cfg-prompt').value;
 
   // Provider settings

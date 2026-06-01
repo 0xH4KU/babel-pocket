@@ -103,6 +103,38 @@ const MIGRATIONS: Migration[] = [
             `);
         },
     },
+    {
+        id: 3,
+        name: 'user_budgets_and_usage',
+        up(db) {
+            db.exec(`
+                CREATE TABLE IF NOT EXISTS user_budgets (
+                    user_id TEXT PRIMARY KEY,
+                    daily_budget_usd REAL NOT NULL
+                );
+
+                CREATE TABLE IF NOT EXISTS user_daily_usage (
+                    user_id TEXT PRIMARY KEY,
+                    date TEXT NOT NULL,
+                    input_tokens INTEGER NOT NULL,
+                    output_tokens INTEGER NOT NULL,
+                    requests INTEGER NOT NULL
+                );
+
+                CREATE TABLE IF NOT EXISTS user_usage_history (
+                    user_id TEXT NOT NULL,
+                    date TEXT NOT NULL,
+                    input_tokens INTEGER NOT NULL,
+                    output_tokens INTEGER NOT NULL,
+                    requests INTEGER NOT NULL,
+                    PRIMARY KEY (user_id, date)
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_user_usage_history_lookup
+                    ON user_usage_history (user_id, date);
+            `);
+        },
+    },
 ];
 
 let sharedDatabase: DatabaseSync | null = null;
@@ -204,6 +236,9 @@ const STORE_TABLES = new Set([
     'usage_history',
     'guild_usage_history',
     'guild_glossary',
+    'user_budgets',
+    'user_daily_usage',
+    'user_usage_history',
 ]);
 
 export function isSqliteStoreEmpty(db: DatabaseSync): boolean {

@@ -1,9 +1,8 @@
 export const APP_VERSION = '0.1.2';
 
-export const REPOSITORY_URL = 'https://github.com/0xH4KU/babel-discord-translator';
+export const REPOSITORY_URL = 'https://github.com/0xH4KU/babel-pocket';
 
-const LATEST_RELEASE_URL =
-    'https://api.github.com/repos/0xH4KU/babel-discord-translator/releases/latest';
+const LATEST_RELEASE_URL = 'https://api.github.com/repos/0xH4KU/babel-pocket/releases/latest';
 const VERSION_UPDATE_CACHE_TTL_MS = 60 * 60 * 1000;
 
 export type VersionUpdateStatus =
@@ -92,7 +91,7 @@ export async function getVersionUpdateStatus({
         const response = await fetchImpl(latestReleaseUrl, {
             headers: {
                 Accept: 'application/vnd.github+json',
-                'User-Agent': 'babel-discord-translator',
+                'User-Agent': 'babel-pocket',
             },
         });
 

@@ -1,7 +1,7 @@
 {
-  "name": "babel-discord-translator",
+  "name": "babel-pocket",
   "version": "0.1.2",
-  "description": "Discord right-click translation bot powered by Vertex AI Gemini — with LRU cache, cost tracking, multilingual support, and web dashboard",
+  "description": "Self-hosted user-install Discord translator for you and friends",
   "type": "module",
   "main": "dist/src/index.js",
   "scripts": {
@@ -33,7 +33,7 @@
   "license": "GPL-3.0-only",
   "repository": {
     "type": "git",
-    "url": "https://github.com/0xH4KU/babel-discord-translator"
+    "url": "https://github.com/0xH4KU/babel-pocket"
   },
   "engines": {
     "node": ">=22.5.0"

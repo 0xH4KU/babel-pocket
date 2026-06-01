@@ -17,7 +17,7 @@ interface BuildDashboardDemoOptions {
 
 const DEMO_STATS = {
     bot: {
-        name: 'Babel Demo#0110',
+        name: 'Babel Pocket Demo#0110',
         avatar: 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2264%22 height=%2264%22 viewBox=%220 0 64 64%22%3E%3Crect width=%2264%22 height=%2264%22 rx=%2218%22 fill=%22%235865f2%22/%3E%3Ctext x=%2232%22 y=%2240%22 text-anchor=%22middle%22 font-family=%22Arial%22 font-size=%2228%22 font-weight=%22700%22 fill=%22white%22%3EB%3C/text%3E%3C/svg%3E',
         uptime: 342_720,
         memoryMB: '86.3',
@@ -26,7 +26,7 @@ const DEMO_STATS = {
             heapUsedMB: '33.1',
             externalMB: '4.6',
         },
-        guilds: 4,
+        guilds: 0,
     },
     translations: {
         total: 1284,
@@ -122,8 +122,8 @@ const DEMO_STATS = {
             exceededCount: 0,
             warnings: [
                 {
-                    id: '100000000000000001',
-                    name: 'Builder Lounge',
+                    id: '200000000000000001',
+                    name: '200000000000000001',
                     budget: 1.25,
                     totalCost: 1.07,
                     usedPercent: 0.856,
@@ -135,8 +135,8 @@ const DEMO_STATS = {
             {
                 area: 'budget',
                 severity: 'warning',
-                title: 'Server budget nearing limit',
-                action: 'Review per-server usage and adjust budgets before translations are blocked.',
+                title: 'User budget nearing limit',
+                action: 'Review per-user usage and adjust budgets before translations are blocked.',
             },
             {
                 area: 'provider',
@@ -164,10 +164,10 @@ const DEMO_STATS = {
         budgetUsedPercent: 10.69,
         budgetExceeded: false,
     },
-    guildBudgets: [
+    userBudgets: [
         {
-            id: '100000000000000001',
-            name: 'Builder Lounge',
+            id: '200000000000000001',
+            name: '200000000000000001',
             budget: 1.25,
             isCustom: true,
             totalCost: 1.07,
@@ -175,8 +175,8 @@ const DEMO_STATS = {
             exceeded: false,
         },
         {
-            id: '100000000000000002',
-            name: 'Indie Game Dev',
+            id: '200000000000000002',
+            name: '200000000000000002',
             budget: 0.75,
             isCustom: false,
             totalCost: 0.28,
@@ -184,8 +184,8 @@ const DEMO_STATS = {
             exceeded: false,
         },
         {
-            id: '100000000000000003',
-            name: 'Open Source Asia',
+            id: '200000000000000004',
+            name: '200000000000000004',
             budget: 0,
             isCustom: true,
             totalCost: 0.15,
@@ -193,6 +193,7 @@ const DEMO_STATS = {
             exceeded: false,
         },
     ],
+    guildBudgets: [],
     errors: 9,
 };
 
@@ -202,13 +203,15 @@ const DEMO_CONFIG = {
     gcpProject: 'babel-demo-project',
     gcpLocation: 'global',
     geminiModel: 'gemini-2.5-flash-lite',
-    allowedGuildIds: ['100000000000000001', '100000000000000002'],
+    allowedGuildIds: [],
+    allowedUserIds: ['200000000000000001', '200000000000000002', '200000000000000004'],
     cooldownSeconds: 5,
     cacheMaxSize: 2000,
     setupComplete: true,
     inputPricePerMillion: 0.1,
     outputPricePerMillion: 0.4,
     dailyBudgetUsd: 0.75,
+    defaultUserDailyBudgetUsd: 0.75,
     translationPrompt: '',
     maxInputLength: 2000,
     maxOutputTokens: 1000,
@@ -224,36 +227,9 @@ const DEMO_CONFIG = {
     translationProvider: 'vertex+openai',
 };
 
-const DEMO_GUILDS = [
-    {
-        id: '100000000000000001',
-        name: 'Builder Lounge',
-        icon: '',
-        memberCount: 1842,
-    },
-    {
-        id: '100000000000000002',
-        name: 'Indie Game Dev',
-        icon: '',
-        memberCount: 637,
-    },
-    {
-        id: '100000000000000003',
-        name: 'Open Source Asia',
-        icon: '',
-        memberCount: 1294,
-    },
-    {
-        id: '100000000000000004',
-        name: 'Polyglot Study',
-        icon: '',
-        memberCount: 483,
-    },
-];
-
-const DEMO_GUILD_BUDGETS = {
-    '100000000000000001': {
-        name: 'Builder Lounge',
+const DEMO_USER_BUDGET_DETAILS = {
+    '200000000000000001': {
+        name: '200000000000000001',
         budget: 1.25,
         usage: {
             date: '2026-06-01',
@@ -268,8 +244,8 @@ const DEMO_GUILD_BUDGETS = {
             budgetExceeded: false,
         },
     },
-    '100000000000000002': {
-        name: 'Indie Game Dev',
+    '200000000000000002': {
+        name: '200000000000000002',
         budget: -1,
         usage: {
             date: '2026-06-01',
@@ -284,8 +260,8 @@ const DEMO_GUILD_BUDGETS = {
             budgetExceeded: false,
         },
     },
-    '100000000000000003': {
-        name: 'Open Source Asia',
+    '200000000000000004': {
+        name: '200000000000000004',
         budget: 0,
         usage: {
             date: '2026-06-01',
@@ -300,8 +276,8 @@ const DEMO_GUILD_BUDGETS = {
             budgetExceeded: false,
         },
     },
-    '100000000000000004': {
-        name: 'Polyglot Study',
+    '200000000000000005': {
+        name: '200000000000000005',
         budget: -1,
         usage: {
             date: '2026-06-01',
@@ -316,6 +292,12 @@ const DEMO_GUILD_BUDGETS = {
             budgetExceeded: false,
         },
     },
+};
+
+const DEMO_USER_BUDGETS: Record<string, { budget: number; isCustom: boolean }> = {
+    '200000000000000001': { budget: 1.25, isCustom: true },
+    '200000000000000002': { budget: 0.75, isCustom: false },
+    '200000000000000004': { budget: 0, isCustom: true },
 };
 
 const DEMO_HISTORY = [
@@ -366,8 +348,8 @@ const DEMO_HISTORY = [
 const DEMO_LOGS = [
     {
         type: 'translation',
-        guildId: '100000000000000001',
-        guildName: 'Builder Lounge',
+        guildId: null,
+        guildName: 'Private Channel',
         userId: '200000000000000001',
         userTag: 'alice#1024',
         contentPreview: 'Can someone translate the release notes?',
@@ -378,8 +360,8 @@ const DEMO_LOGS = [
     },
     {
         type: 'translation',
-        guildId: '100000000000000002',
-        guildName: 'Indie Game Dev',
+        guildId: null,
+        guildName: 'Bot DM',
         userId: '200000000000000002',
         userTag: 'kenji#2048',
         contentPreview: 'The prototype build is ready for testing.',
@@ -390,12 +372,12 @@ const DEMO_LOGS = [
     },
     {
         type: 'error',
-        guildId: '100000000000000001',
-        guildName: 'Builder Lounge',
+        guildId: null,
+        guildName: 'Private Channel',
         userId: '200000000000000003',
         userTag: 'mira#3001',
         error: 'Provider request timed out after 15000ms',
-        command: 'Babel',
+        command: 'Babel Pocket',
         requestId: 'demo-req-7f1a',
         provider: 'vertex',
         errorType: 'timeout',
@@ -404,8 +386,8 @@ const DEMO_LOGS = [
     },
     {
         type: 'translation',
-        guildId: '100000000000000003',
-        guildName: 'Open Source Asia',
+        guildId: null,
+        guildName: 'Guild Channel',
         userId: '200000000000000004',
         userTag: 'sofia#7788',
         contentPreview: 'Please keep the code comments in English.',
@@ -416,12 +398,12 @@ const DEMO_LOGS = [
     },
     {
         type: 'error',
-        guildId: '100000000000000002',
-        guildName: 'Indie Game Dev',
+        guildId: null,
+        guildName: 'Bot DM',
         userId: '200000000000000005',
         userTag: 'dani#4421',
         error: 'OpenAI-compatible provider returned 429',
-        command: 'translate',
+        command: 'Babel Pocket',
         requestId: 'demo-req-9c42',
         provider: 'openai',
         errorType: 'rate_limit',
@@ -438,46 +420,13 @@ const DEMO_USER_PREFS = {
     '200000000000000005': 'es',
 };
 
-const DEMO_GLOSSARY = {
-    entries: [
-        {
-            id: 1,
-            guildId: '100000000000000001',
-            sourceText: 'Babel',
-            targetText: 'Babel',
-            notes: 'Preserve project name',
-            createdAt: '2026-06-01T00:00:00.000Z',
-            updatedAt: '2026-06-01T00:00:00.000Z',
-        },
-        {
-            id: 2,
-            guildId: '100000000000000001',
-            sourceText: 'release notes',
-            targetText: '版本公告',
-            notes: 'Community wording',
-            createdAt: '2026-06-01T00:00:00.000Z',
-            updatedAt: '2026-06-01T00:00:00.000Z',
-        },
-        {
-            id: 3,
-            guildId: '100000000000000001',
-            sourceText: 'raid',
-            targetText: '團本',
-            notes: 'Game term',
-            createdAt: '2026-06-01T00:00:00.000Z',
-            updatedAt: '2026-06-01T00:00:00.000Z',
-        },
-    ],
-    count: 3,
-};
-
 const DEMO_VERSION = {
     version: '0.1.2',
-    repositoryUrl: 'https://github.com/0xH4KU/babel-discord-translator',
+    repositoryUrl: 'https://github.com/0xH4KU/babel-pocket',
     update: {
         status: 'current',
         latestVersion: '0.1.2',
-        latestUrl: 'https://github.com/0xH4KU/babel-discord-translator/releases/tag/v0.1.2',
+        latestUrl: 'https://github.com/0xH4KU/babel-pocket/releases/tag/v0.1.2',
     },
 };
 
@@ -510,7 +459,11 @@ function writeJson(path: string, data: unknown): void {
 
 function injectDemoAssets(html: string): string {
     const withTitle = html
-        .replace('<title>Babel — Dashboard</title>', '<title>Babel — Dashboard Demo</title>')
+        .replace(
+            '<title>Babel Pocket — Dashboard</title>',
+            '<title>Babel Pocket — Dashboard Demo</title>',
+        )
+        .replace('<title>Babel — Dashboard</title>', '<title>Babel Pocket — Dashboard Demo</title>')
         .replace(
             '<script src="js/utils.js"></script>',
             '<script src="js/utils.js"></script>\n        <script src="demo/demo-api.js"></script>',
@@ -554,15 +507,14 @@ export function buildDashboardDemo({
 
     writeJson(join(fixtureDir, 'stats.json'), DEMO_STATS);
     writeJson(join(fixtureDir, 'config.json'), DEMO_CONFIG);
-    writeJson(join(fixtureDir, 'guilds.json'), DEMO_GUILDS);
-    writeJson(join(fixtureDir, 'guild-budgets.json'), DEMO_GUILD_BUDGETS);
+    writeJson(join(fixtureDir, 'user-budgets.json'), DEMO_USER_BUDGETS);
+    writeJson(join(fixtureDir, 'user-budget-details.json'), DEMO_USER_BUDGET_DETAILS);
     writeJson(join(fixtureDir, 'history.json'), DEMO_HISTORY);
     writeJson(join(fixtureDir, 'logs.json'), DEMO_LOGS);
     writeJson(join(fixtureDir, 'user-prefs.json'), {
         prefs: DEMO_USER_PREFS,
         count: Object.keys(DEMO_USER_PREFS).length,
     });
-    writeJson(join(fixtureDir, 'guild-glossary.json'), DEMO_GLOSSARY);
     writeJson(join(fixtureDir, 'sessions.json'), {
         sessions: [
             {
@@ -629,15 +581,10 @@ const DEMO_API_JS = `
     '/version': 'version.json',
     '/version/refresh': 'version.json',
     '/config': 'config.json',
-    '/guilds': 'guilds.json',
-    '/guild-budgets': 'guild-budgets.json',
+    '/user-budgets': 'user-budgets.json',
     '/usage/history': 'history.json',
     '/logs': 'logs.json',
     '/user-prefs': 'user-prefs.json',
-    '/guild-glossary/100000000000000001': 'guild-glossary.json',
-    '/guild-glossary/100000000000000002': { entries: [], count: 0 },
-    '/guild-glossary/100000000000000003': { entries: [], count: 0 },
-    '/guild-glossary/100000000000000004': { entries: [], count: 0 },
     '/sessions': 'sessions.json'
   };
 
@@ -687,7 +634,7 @@ const DEMO_READONLY_JS = `
     const banner = document.createElement('div');
     banner.className = 'demo-banner';
     banner.innerHTML =
-      '<div><strong>Babel dashboard demo</strong><span>Mock data only. No Discord or AI provider is connected.</span></div>' +
+      '<div><strong>Babel Pocket dashboard demo</strong><span>Mock data only. No Discord or AI provider is connected.</span></div>' +
       '<div class="demo-badge">Read-only demo</div>';
     document.body.prepend(banner);
   }
@@ -698,7 +645,7 @@ const DEMO_READONLY_JS = `
       '#wizard-view',
       '#cfg-apikey',
       '#cfg-openai-apikey',
-      '#add-guild-input',
+      '#add-user-input',
       '#prefs-batch-delete',
       '[onclick*="save"]',
       '[onclick*="delete"]',

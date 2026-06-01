@@ -1,25 +1,21 @@
 /**
- * Access tab: guild whitelist management, per-guild budgets, and user language preferences.
+ * Access tab: user whitelist management, per-user budgets, and user language preferences.
  */
 
-let allGuilds = [];
-let guildBudgetData = {};
-let guildPage = 1,
-    guildPageSize = 15;
-let manualGuildIds = [];
-let accessAllowedGuildIdsDraft = [];
+let userBudgetData = {};
+let allowedUsersPage = 1,
+    allowedUsersPageSize = 15;
+let accessAllowedUserIdsDraft = [];
 let accessWhitelistDirty = false;
 let accessWhitelistLoaded = false;
-let glossaryGuildId = '';
-let glossaryEntries = [];
 
-function normalizeGuildIds(ids) {
+function normalizeUserIds(ids) {
     return [...new Set((ids || []).map((id) => String(id).trim()).filter(Boolean))];
 }
 
-function sameGuildIds(a, b) {
-    const left = normalizeGuildIds(a).sort();
-    const right = normalizeGuildIds(b).sort();
+function sameUserIds(a, b) {
+    const left = normalizeUserIds(a).sort();
+    const right = normalizeUserIds(b).sort();
 
     if (left.length !== right.length) return false;
     return left.every((id, index) => id === right[index]);
@@ -27,7 +23,7 @@ function sameGuildIds(a, b) {
 
 function updateAccessSaveState() {
     const status = accessWhitelistDirty
-        ? `${accessAllowedGuildIdsDraft.length} enabled server(s) pending save`
+        ? `${accessAllowedUserIdsDraft.length} enabled user(s) pending save`
         : 'No unsaved whitelist changes';
 
     document.querySelectorAll('[data-access-save-status]').forEach((node) => {
@@ -40,179 +36,158 @@ function updateAccessSaveState() {
     });
 }
 
-function setAccessWhitelistDraft(allowedGuildIds) {
-    accessAllowedGuildIdsDraft = normalizeGuildIds(allowedGuildIds);
-    accessWhitelistDirty = !sameGuildIds(
-        accessAllowedGuildIdsDraft,
-        currentConfig.allowedGuildIds || [],
+function setAccessWhitelistDraft(allowedUserIds) {
+    accessAllowedUserIdsDraft = normalizeUserIds(allowedUserIds);
+    accessWhitelistDirty = !sameUserIds(
+        accessAllowedUserIdsDraft,
+        currentConfig.allowedUserIds || [],
     );
     updateAccessSaveState();
 }
 
 async function loadAccess() {
     try {
-        const [cfgRes, guildRes, budgetRes] = await Promise.all([
-            api('/config'),
-            api('/guilds'),
-            api('/guild-budgets'),
-        ]);
+        const [cfgRes, budgetRes] = await Promise.all([api('/config'), api('/user-budgets')]);
         currentConfig = await cfgRes.json();
-        currentConfig.allowedGuildIds = normalizeGuildIds(currentConfig.allowedGuildIds || []);
+        currentConfig.allowedUserIds = normalizeUserIds(currentConfig.allowedUserIds || []);
         if (!accessWhitelistLoaded || !accessWhitelistDirty) {
-            accessAllowedGuildIdsDraft = [...currentConfig.allowedGuildIds];
+            accessAllowedUserIdsDraft = [...currentConfig.allowedUserIds];
         }
         accessWhitelistLoaded = true;
-        allGuilds = await guildRes.json();
-        guildBudgetData = await budgetRes.json();
-        renderGuilds();
-        renderGlossaryGuildSelect();
+        userBudgetData = await budgetRes.json();
+        renderAllowedUsers();
         updateAccessSaveState();
         loadUserPrefs();
     } catch {}
 }
 
-async function saveGuildWhitelist() {
-    const allowedGuildIds = normalizeGuildIds(accessAllowedGuildIdsDraft);
+async function saveUserWhitelist() {
+    const allowedUserIds = normalizeUserIds(accessAllowedUserIdsDraft);
 
     const res = await api('/config', {
         method: 'POST',
-        body: JSON.stringify({ allowedGuildIds }),
+        body: JSON.stringify({ allowedUserIds }),
     });
 
     if (res.ok) {
-        currentConfig.allowedGuildIds = [...allowedGuildIds];
-        accessAllowedGuildIdsDraft = [...allowedGuildIds];
+        currentConfig.allowedUserIds = [...allowedUserIds];
+        accessAllowedUserIdsDraft = [...allowedUserIds];
         accessWhitelistDirty = false;
         updateAccessSaveState();
-        renderGuilds();
+        renderAllowedUsers();
         showToast('Access settings saved!');
     } else {
         showToast('Save failed', true);
     }
 }
 
-function toggleGuildAllowed(guildId, checked) {
-    const nextAllowed = new Set(accessAllowedGuildIdsDraft);
+function renderAllowedUsers() {
+    const container = document.getElementById('user-access-list');
+    if (!container) return;
 
-    if (checked) {
-        nextAllowed.add(guildId);
-    } else {
-        nextAllowed.delete(guildId);
-    }
+    const allowed = accessAllowedUserIdsDraft;
+    const defaultBudget = currentConfig.defaultUserDailyBudgetUsd || 0;
 
-    setAccessWhitelistDraft([...nextAllowed]);
-    renderGuilds();
-}
-
-function renderGuilds() {
-    const container = document.getElementById('guild-list');
-    const allowed = accessAllowedGuildIdsDraft;
-    const globalBudget = currentConfig.dailyBudgetUsd || 0;
-
-    const knownIds = new Set(allGuilds.map((g) => g.id));
-    manualGuildIds = allowed.filter((id) => !knownIds.has(id));
-
-    const allItems = [
-        ...allGuilds.map((g) => ({ ...g, manual: false })),
-        ...manualGuildIds.map((id) => ({ id, name: id, manual: true })),
-    ];
-
-    if (allItems.length === 0) {
+    if (allowed.length === 0) {
         container.innerHTML =
-            '<div class="no-guilds">Bot is not in any servers. Paste a Guild ID below to add manually.</div>';
-        document.getElementById('guild-pagination').innerHTML = '';
+            '<div class="no-guilds">No users are whitelisted. Paste a Discord User ID below to add one.</div>';
+        document.getElementById('user-access-pagination').innerHTML = '';
         return;
     }
 
-    const totalPages = Math.max(Math.ceil(allItems.length / guildPageSize), 1);
-    guildPage = Math.min(guildPage, totalPages);
-    const start = (guildPage - 1) * guildPageSize;
-    const pageItems = allItems.slice(start, start + guildPageSize);
+    const totalPages = Math.max(Math.ceil(allowed.length / allowedUsersPageSize), 1);
+    allowedUsersPage = Math.min(allowedUsersPage, totalPages);
+    const start = (allowedUsersPage - 1) * allowedUsersPageSize;
+    const pageItems = allowed.slice(start, start + allowedUsersPageSize);
 
-    const html = pageItems
-        .map((g) => {
-            const checked = allowed.includes(g.id);
-            const bd = guildBudgetData[g.id];
-            const hasCustomBudget = bd && bd.budget >= 0;
-            const effectiveBudget = hasCustomBudget ? bd.budget : globalBudget;
-            const todayCost = bd ? bd.usage.totalCost : 0;
+    container.innerHTML = pageItems
+        .map((userId) => {
+            const budgetData = userBudgetData[userId];
+            const hasCustomBudget = budgetData && budgetData.isCustom;
+            const effectiveBudget = hasCustomBudget ? budgetData.budget : defaultBudget;
             const budgetLabel = hasCustomBudget
                 ? formatUsd(effectiveBudget)
-                : globalBudget > 0
-                  ? formatUsd(globalBudget) + ' (global)'
+                : defaultBudget > 0
+                  ? formatUsd(defaultBudget) + ' (default)'
                   : 'Unlimited';
-            const costLabel = bd ? formatUsd(todayCost) : '-';
-
-            if (g.manual) {
-                return `<div class="guild-item guild-item-col">
-        <div class="guild-item-row">
-          <img src="${genAvatar(g.id)}" alt="">
-          <span class="guild-name" style="font-family:monospace;font-size:0.8rem">${g.id}</span>
-          <span class="guild-members">manually added</span>
-          <label class="toggle"><input type="checkbox" data-guild-id="${g.id}" onchange="toggleGuildAllowed('${g.id}', this.checked)" checked><span class="slider"></span></label>
-          <button class="btn-danger" onclick="removeManualGuild('${g.id}')">✕</button>
-        </div>
-      </div>`;
-            }
-
-            const pct =
-                effectiveBudget > 0 ? Math.min((todayCost / effectiveBudget) * 100, 100) : 0;
-            const barClass = pct > 90 ? ' danger' : pct > 60 ? ' warning' : '';
 
             return `<div class="guild-item guild-item-col">
       <div class="guild-item-row">
-        <img src="${g.icon || genAvatar(g.name || g.id)}" alt="">
-        <span class="guild-name">${g.name || g.id}</span>
-        <span class="guild-members">${g.memberCount ?? '?'} members</span>
-        <label class="toggle"><input type="checkbox" data-guild-id="${g.id}" onchange="toggleGuildAllowed('${g.id}', this.checked)" ${checked ? 'checked' : ''}><span class="slider"></span></label>
+        <img src="${genAvatar(userId)}" alt="">
+        <span class="guild-name" style="font-family:monospace;font-size:0.85rem">${userId}</span>
+        <span class="guild-members">whitelisted user</span>
+        <button class="btn-danger" onclick="removeAllowedUser('${userId}')">Remove</button>
       </div>
       <div class="guild-budget-row">
         <div class="guild-budget-info">
           <span class="guild-budget-label">Budget: ${budgetLabel}</span>
-          <span class="guild-budget-cost">Today: ${costLabel}${bd ? ' · ' + bd.usage.requests + ' req' : ''}</span>
         </div>
-        ${effectiveBudget > 0 ? `<div class="guild-budget-bar"><div class="fill${barClass}" style="width:${pct}%"></div></div>` : ''}
         <div class="guild-budget-actions">
-          <input type="number" class="guild-budget-input" id="gb-${g.id}" min="0" step="0.1"
-            placeholder="${hasCustomBudget ? effectiveBudget : 'Global'}"
+          <input type="number" class="guild-budget-input" id="ub-${userId}" min="0" step="0.1"
+            placeholder="${hasCustomBudget ? effectiveBudget : 'Default'}"
             value="${hasCustomBudget ? effectiveBudget : ''}"
-            title="Set per-server budget (USD). Empty = use global.">
-          <button class="btn btn-secondary btn-xs" onclick="saveGuildBudget('${g.id}')">Set</button>
-          ${hasCustomBudget ? `<button class="btn-danger btn-xs" onclick="resetGuildBudget('${g.id}')" title="Reset to global">↺</button>` : ''}
+            title="Set per-user budget (USD). Empty = use default.">
+          <button class="btn btn-secondary btn-xs" onclick="saveUserBudget('${userId}')">Set</button>
+          ${hasCustomBudget ? `<button class="btn-danger btn-xs" onclick="resetUserBudget('${userId}')" title="Reset to default">↺</button>` : ''}
         </div>
       </div>
     </div>`;
         })
         .join('');
 
-    container.innerHTML = html;
-
-    renderPagination('guild-pagination', {
-        total: allItems.length,
-        page: guildPage,
-        pageSize: guildPageSize,
-        onPageChange: 'setGuildPage',
-        onSizeChange: 'setGuildPageSize',
+    renderPagination('user-access-pagination', {
+        total: allowed.length,
+        page: allowedUsersPage,
+        pageSize: allowedUsersPageSize,
+        onPageChange: 'setAllowedUsersPage',
+        onSizeChange: 'setAllowedUsersPageSize',
     });
 }
 
-function setGuildPage(p) {
-    guildPage = p;
-    renderGuilds();
+function setAllowedUsersPage(p) {
+    allowedUsersPage = p;
+    renderAllowedUsers();
 }
-function setGuildPageSize(s) {
-    guildPageSize = s;
-    guildPage = 1;
-    renderGuilds();
+function setAllowedUsersPageSize(s) {
+    allowedUsersPageSize = s;
+    allowedUsersPage = 1;
+    renderAllowedUsers();
 }
 
-async function saveGuildBudget(guildId) {
-    const input = document.getElementById('gb-' + guildId);
+function addAllowedUser() {
+    const input = document.getElementById('add-user-input');
+    const id = input.value.trim();
+    if (!id || !/^\d+$/.test(id)) {
+        showToast('Please enter a valid Discord User ID (numbers only)', true);
+        return;
+    }
+
+    const nextAllowed = new Set(accessAllowedUserIdsDraft);
+    if (nextAllowed.has(id)) {
+        showToast('User already in whitelist draft');
+        return;
+    }
+
+    nextAllowed.add(id);
+    setAccessWhitelistDraft([...nextAllowed]);
+    allowedUsersPage = Math.max(Math.ceil(nextAllowed.size / allowedUsersPageSize), 1);
+    input.value = '';
+    renderAllowedUsers();
+    showToast('User added — click Save to apply');
+}
+
+function removeAllowedUser(id) {
+    setAccessWhitelistDraft(accessAllowedUserIdsDraft.filter((userId) => userId !== id));
+    renderAllowedUsers();
+    showToast('User removed — click Save to apply');
+}
+
+async function saveUserBudget(userId) {
+    const input = document.getElementById('ub-' + userId);
     const val = input.value.trim();
 
     if (val === '') {
-        // Reset to global
-        return resetGuildBudget(guildId);
+        return resetUserBudget(userId);
     }
 
     const budget = parseFloat(val);
@@ -221,234 +196,34 @@ async function saveGuildBudget(guildId) {
         return;
     }
 
-    const res = await api('/guild-budgets/' + guildId, {
+    const res = await api('/user-budgets/' + userId, {
         method: 'POST',
         body: JSON.stringify({ dailyBudgetUsd: budget }),
     });
 
     if (res.ok) {
-        showToast('Guild budget saved!');
-        // Refresh data
-        const budgetRes = await api('/guild-budgets');
-        guildBudgetData = await budgetRes.json();
-        renderGuilds();
+        showToast('User budget saved!');
+        const budgetRes = await api('/user-budgets');
+        userBudgetData = await budgetRes.json();
+        renderAllowedUsers();
     } else {
         showToast('Save failed', true);
     }
 }
 
-async function resetGuildBudget(guildId) {
-    const res = await api('/guild-budgets/' + guildId, {
+async function resetUserBudget(userId) {
+    const res = await api('/user-budgets/' + userId, {
         method: 'POST',
         body: JSON.stringify({ dailyBudgetUsd: null }),
     });
 
     if (res.ok) {
-        showToast('Reset to global budget');
-        const budgetRes = await api('/guild-budgets');
-        guildBudgetData = await budgetRes.json();
-        renderGuilds();
+        showToast('Reset to default user budget');
+        const budgetRes = await api('/user-budgets');
+        userBudgetData = await budgetRes.json();
+        renderAllowedUsers();
     } else {
         showToast('Reset failed', true);
-    }
-}
-
-function addManualGuild() {
-    const input = document.getElementById('add-guild-input');
-    const id = input.value.trim();
-    if (!id || !/^\d+$/.test(id)) {
-        showToast('Please enter a valid Guild ID (numbers only)', true);
-        return;
-    }
-
-    const nextAllowed = new Set(accessAllowedGuildIdsDraft);
-    if (nextAllowed.has(id)) {
-        showToast('Guild already in whitelist draft');
-        return;
-    }
-
-    nextAllowed.add(id);
-    setAccessWhitelistDraft([...nextAllowed]);
-    guildPage = Math.max(Math.ceil((allGuilds.length + nextAllowed.size) / guildPageSize), 1);
-    input.value = '';
-    renderGuilds();
-    showToast('Guild added — click Save to apply');
-}
-
-function removeManualGuild(id) {
-    setAccessWhitelistDraft(accessAllowedGuildIdsDraft.filter((g) => g !== id));
-    renderGuilds();
-    renderGlossaryGuildSelect();
-    showToast('Guild removed — click Save to apply');
-}
-
-// ===== Server Glossary =====
-
-function getGlossaryGuildOptions() {
-    const known = allGuilds.map((g) => ({ id: g.id, name: g.name || g.id }));
-    const knownIds = new Set(known.map((g) => g.id));
-    const manual = accessAllowedGuildIdsDraft
-        .filter((id) => !knownIds.has(id))
-        .map((id) => ({ id, name: id }));
-
-    return [...known, ...manual].sort((a, b) => a.name.localeCompare(b.name));
-}
-
-function renderGlossaryGuildSelect() {
-    const select = document.getElementById('glossary-guild');
-    if (!select) return;
-
-    const options = getGlossaryGuildOptions();
-    if (options.length === 0) {
-        select.innerHTML = '<option value="">No servers available</option>';
-        glossaryGuildId = '';
-        glossaryEntries = [];
-        renderGlossaryEntries();
-        return;
-    }
-
-    if (!glossaryGuildId || !options.some((guild) => guild.id === glossaryGuildId)) {
-        glossaryGuildId = options[0].id;
-    }
-
-    select.innerHTML = options
-        .map(
-            (guild) =>
-                `<option value="${guild.id}" ${guild.id === glossaryGuildId ? 'selected' : ''}>${guild.name}</option>`,
-        )
-        .join('');
-
-    loadGlossaryEntries();
-}
-
-async function selectGlossaryGuild(guildId) {
-    glossaryGuildId = guildId || '';
-    resetGlossaryForm();
-    await loadGlossaryEntries();
-}
-
-async function loadGlossaryEntries() {
-    const container = document.getElementById('glossary-container');
-    if (!container || !glossaryGuildId) {
-        renderGlossaryEntries();
-        return;
-    }
-
-    try {
-        const res = await api('/guild-glossary/' + glossaryGuildId);
-        if (!res.ok) {
-            showToast('Failed to load glossary', true);
-            return;
-        }
-
-        const data = await res.json();
-        glossaryEntries = data.entries || [];
-        renderGlossaryEntries();
-    } catch {
-        showToast('Failed to load glossary', true);
-    }
-}
-
-function renderGlossaryEntries() {
-    const container = document.getElementById('glossary-container');
-    if (!container) return;
-
-    if (!glossaryGuildId) {
-        container.innerHTML = '<div class="empty-state">Select a server to manage glossary terms.</div>';
-        return;
-    }
-
-    if (glossaryEntries.length === 0) {
-        container.innerHTML = '<div class="empty-state">No glossary terms for this server yet.</div>';
-        return;
-    }
-
-    const rows = glossaryEntries
-        .map(
-            (entry) => `<tr>
-      <td class="mono">${entry.sourceText}</td>
-      <td class="mono">${entry.targetText}</td>
-      <td class="dim">${entry.notes || '-'}</td>
-      <td>
-        <button class="btn btn-secondary btn-xs" onclick="editGlossaryEntry(${entry.id})">Edit</button>
-        <button class="btn-danger" onclick="deleteGlossaryEntry(${entry.id})">Delete</button>
-      </td>
-    </tr>`,
-        )
-        .join('');
-
-    container.innerHTML = `<div class="table-scroll"><table class="data-table glossary-table">
-      <thead><tr><th>Source</th><th>Target</th><th>Notes</th><th></th></tr></thead>
-      <tbody>${rows}</tbody>
-    </table></div>`;
-}
-
-function resetGlossaryForm() {
-    document.getElementById('glossary-entry-id').value = '';
-    document.getElementById('glossary-source').value = '';
-    document.getElementById('glossary-target').value = '';
-    document.getElementById('glossary-notes').value = '';
-}
-
-function editGlossaryEntry(entryId) {
-    const entry = glossaryEntries.find((item) => item.id === entryId);
-    if (!entry) return;
-
-    document.getElementById('glossary-entry-id').value = entry.id;
-    document.getElementById('glossary-source').value = entry.sourceText;
-    document.getElementById('glossary-target').value = entry.targetText;
-    document.getElementById('glossary-notes').value = entry.notes || '';
-}
-
-async function saveGlossaryEntry() {
-    if (!glossaryGuildId) {
-        showToast('Select a server first', true);
-        return;
-    }
-
-    const id = document.getElementById('glossary-entry-id').value;
-    const sourceText = document.getElementById('glossary-source').value.trim();
-    const targetText = document.getElementById('glossary-target').value.trim();
-    const notes = document.getElementById('glossary-notes').value.trim();
-
-    if (!sourceText || !targetText) {
-        showToast('Source and target are required', true);
-        return;
-    }
-
-    const res = await api('/guild-glossary/' + glossaryGuildId, {
-        method: 'POST',
-        body: JSON.stringify({
-            ...(id ? { id: Number(id) } : {}),
-            sourceText,
-            targetText,
-            notes,
-        }),
-    });
-
-    if (res.ok) {
-        resetGlossaryForm();
-        await loadGlossaryEntries();
-        showToast('Glossary term saved');
-    } else {
-        const data = await res.json().catch(() => ({}));
-        showToast(data.error || 'Save failed', true);
-    }
-}
-
-async function deleteGlossaryEntry(entryId) {
-    if (!glossaryGuildId) return;
-
-    const res = await api('/guild-glossary/' + glossaryGuildId + '/' + entryId, {
-        method: 'DELETE',
-    });
-
-    if (res.ok) {
-        glossaryEntries = glossaryEntries.filter((entry) => entry.id !== entryId);
-        renderGlossaryEntries();
-        showToast('Glossary term deleted');
-    } else {
-        showToast('Delete failed', true);
     }
 }
 

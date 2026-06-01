@@ -3,7 +3,7 @@
     <head>
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <title>Babel — Dashboard</title>
+        <title>Babel Pocket — Dashboard</title>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link
             href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
@@ -23,7 +23,7 @@
         <!-- ===== LOGIN ===== -->
         <div id="login-view" class="view">
             <div class="login-card">
-                <h1>Babel</h1>
+                <h1>Babel Pocket</h1>
                 <div class="subtitle">Translation Bot Dashboard</div>
                 <div class="input-group">
                     <label>Password</label>
@@ -139,7 +139,7 @@
                     <a
                         class="version-link"
                         id="version-link"
-                        href="https://github.com/0xH4KU/babel-discord-translator"
+                        href="https://github.com/0xH4KU/babel-pocket"
                         target="_blank"
                         rel="noopener noreferrer"
                         >v0.1.2</a
@@ -172,7 +172,7 @@
             <div class="tab-content active" id="tab-overview">
                 <div class="budget-card" id="budget-card">
                     <div class="budget-header">
-                        <span class="label">Server Budgets</span>
+                        <span class="label">User Budgets</span>
                         <span class="amount" id="budget-amount">-</span>
                     </div>
                     <div id="guild-budget-overview"></div>
@@ -302,22 +302,22 @@
             <!-- Access Tab -->
             <div class="tab-content" id="tab-access">
                 <div class="settings-section">
-                    <h3>Server Whitelist</h3>
+                    <h3>User Whitelist</h3>
                     <div class="desc-text">
-                        Only <strong>enabled</strong> servers can use translation. New servers are
-                        disabled by default.
+                        Only whitelisted Discord users can use Babel Pocket. New users are disabled
+                        by default.
                     </div>
-                    <div id="guild-list" class="guild-list">
-                        <div class="no-guilds">Loading servers...</div>
+                    <div id="user-access-list" class="guild-list">
+                        <div class="no-guilds">Loading users...</div>
                     </div>
-                    <div id="guild-pagination"></div>
+                    <div id="user-access-pagination"></div>
                     <div class="add-guild-row">
                         <input
                             type="text"
-                            id="add-guild-input"
-                            placeholder="Paste a Guild ID to add manually"
+                            id="add-user-input"
+                            placeholder="Paste a Discord User ID"
                         />
-                        <button class="btn btn-primary btn-sm" onclick="addManualGuild()">
+                        <button class="btn btn-primary btn-sm" onclick="addAllowedUser()">
                             Add
                         </button>
                     </div>
@@ -348,72 +348,6 @@
                     <div id="prefs-pagination"></div>
                 </div>
 
-                <div class="settings-section">
-                    <h3>Server Glossary</h3>
-                    <div class="desc-text">
-                        Configure server-specific term mappings. Use identical source and target
-                        text to preserve names, brands, or game terms.
-                    </div>
-                    <div class="settings-row">
-                        <div class="input-group">
-                            <label>Server</label>
-                            <select
-                                id="glossary-guild"
-                                class="settings-select"
-                                onchange="selectGlossaryGuild(this.value)"
-                            ></select>
-                        </div>
-                    </div>
-                    <div class="glossary-form">
-                        <input type="hidden" id="glossary-entry-id" />
-                        <div class="settings-row">
-                            <div class="input-group">
-                                <label>Source Term</label>
-                                <input
-                                    type="text"
-                                    id="glossary-source"
-                                    maxlength="120"
-                                    placeholder="OpenAI"
-                                />
-                            </div>
-                            <div class="input-group">
-                                <label>Target Term</label>
-                                <input
-                                    type="text"
-                                    id="glossary-target"
-                                    maxlength="120"
-                                    placeholder="OpenAI"
-                                />
-                            </div>
-                        </div>
-                        <div class="settings-row">
-                            <div class="input-group">
-                                <label>Notes</label>
-                                <input
-                                    type="text"
-                                    id="glossary-notes"
-                                    maxlength="200"
-                                    placeholder="Preserve brand name"
-                                />
-                            </div>
-                        </div>
-                        <div class="glossary-actions">
-                            <button class="btn btn-primary btn-sm" onclick="saveGlossaryEntry()">
-                                Save Term
-                            </button>
-                            <button
-                                class="btn btn-secondary btn-sm"
-                                onclick="resetGlossaryForm()"
-                            >
-                                Clear
-                            </button>
-                        </div>
-                    </div>
-                    <div id="glossary-container">
-                        <div class="empty-state">Select a server to manage glossary terms.</div>
-                    </div>
-                </div>
-
                 <div class="save-bar">
                     <span class="save-status" data-access-save-status
                         >No unsaved whitelist changes</span
@@ -421,7 +355,7 @@
                     <button
                         class="btn btn-primary"
                         data-access-save-button
-                        onclick="saveGuildWhitelist()"
+                        onclick="saveUserWhitelist()"
                         disabled
                     >
                         Save Changes
@@ -537,8 +471,16 @@
                             <label>Global Daily Budget (USD, 0 = unlimited)</label>
                             <input type="number" id="cfg-budget" min="0" step="0.1" />
                             <div class="hint">
-                                Default for servers without custom budgets. Set per-server budgets
-                                in Access tab.
+                                Hard cap for the whole instance. Set per-user budgets in Access tab.
+                            </div>
+                        </div>
+                    </div>
+                    <div class="settings-row">
+                        <div class="input-group">
+                            <label>Default User Daily Budget (USD, 0 = unlimited)</label>
+                            <input type="number" id="cfg-user-budget" min="0" step="0.1" />
+                            <div class="hint">
+                                Used for whitelisted users without a custom budget.
                             </div>
                         </div>
                     </div>

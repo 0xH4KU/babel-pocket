@@ -39,12 +39,14 @@ function createStoreMock(overrides: Partial<StoreData> = {}) {
         gcpLocation: 'global',
         geminiModel: 'gemini-2.5-flash-lite',
         allowedGuildIds: ['guild-1'],
+        allowedUserIds: [],
         cooldownSeconds: 0,
         cacheMaxSize: 2000,
         setupComplete: true,
         inputPricePerMillion: 0,
         outputPricePerMillion: 0,
         dailyBudgetUsd: 0,
+        defaultUserDailyBudgetUsd: 0,
         tokenUsage: null,
         usageHistory: [],
         translationPrompt: '',
@@ -59,6 +61,9 @@ function createStoreMock(overrides: Partial<StoreData> = {}) {
         guildBudgets: {},
         guildTokenUsage: {},
         guildUsageHistory: {},
+        userBudgets: {},
+        userTokenUsage: {},
+        userUsageHistory: {},
         ...overrides,
     };
 
@@ -70,12 +75,14 @@ function createStoreMock(overrides: Partial<StoreData> = {}) {
             gcpLocation: data.gcpLocation,
             geminiModel: data.geminiModel,
             allowedGuildIds: [...data.allowedGuildIds],
+            allowedUserIds: [...data.allowedUserIds],
             cooldownSeconds: data.cooldownSeconds,
             cacheMaxSize: data.cacheMaxSize,
             setupComplete: data.setupComplete,
             inputPricePerMillion: data.inputPricePerMillion,
             outputPricePerMillion: data.outputPricePerMillion,
             dailyBudgetUsd: data.dailyBudgetUsd,
+            defaultUserDailyBudgetUsd: data.defaultUserDailyBudgetUsd,
             translationPrompt: data.translationPrompt,
             maxInputLength: data.maxInputLength,
             maxOutputTokens: data.maxOutputTokens,
@@ -101,6 +108,7 @@ function createUserPreferenceStoreMock(overrides: Partial<StoreData> = {}) {
 function createUsageMock() {
     return {
         isBudgetExceeded: vi.fn(() => false),
+        wouldExceedBudget: vi.fn(() => false),
         record: vi.fn(),
     };
 }
@@ -231,7 +239,10 @@ describe('TranslationService', () => {
         );
         expect(Object.prototype.propertyIsEnumerable.call(translatorOptions, 'metrics')).toBe(true);
         expect(translatorOptions?.metrics).toBe(metrics);
-        expect(usageTracker.record).toHaveBeenCalledWith(12, 6, 'guild-1');
+        expect(usageTracker.record).toHaveBeenCalledWith(12, 6, {
+            guildId: 'guild-1',
+            userId: null,
+        });
         expect(log.size).toBe(1);
         expect(stats.totalTranslations).toBe(1);
         expect(stats.apiCalls).toBe(1);
@@ -463,6 +474,58 @@ describe('TranslationService', () => {
         });
         expect(translator).not.toHaveBeenCalled();
         expect(metrics.snapshot().budgetExceededTotal).toBe(1);
+    });
+
+    it('should allow whitelisted user-install owners without a guild id', async () => {
+        const { service, usageTracker } = createService({
+            storeOverrides: {
+                allowedGuildIds: [],
+                allowedUserIds: ['user-owner'],
+                userLanguagePrefs: { 'user-owner': 'ja' },
+            },
+        });
+
+        const result = await service.process({
+            command: 'babel',
+            commandLabel: 'Babel Pocket (context menu)',
+            guildId: null,
+            userId: 'user-owner',
+            billingUserId: 'user-owner',
+            userTag: 'owner#0001',
+            locale: 'en-US',
+            text: 'Hello',
+        });
+
+        expect(result.status).toBe('success');
+        expect(usageTracker.record).toHaveBeenCalledWith(12, 6, {
+            guildId: null,
+            userId: 'user-owner',
+        });
+    });
+
+    it('should block user-install owners that are not whitelisted', async () => {
+        const { service } = createService({
+            storeOverrides: {
+                allowedGuildIds: [],
+                allowedUserIds: ['user-allowed'],
+            },
+        });
+
+        const result = await service.process({
+            command: 'babel',
+            commandLabel: 'Babel Pocket (context menu)',
+            guildId: null,
+            userId: 'user-blocked',
+            billingUserId: 'user-blocked',
+            userTag: 'blocked#0001',
+            locale: 'en-US',
+            text: 'Hello',
+        });
+
+        expect(result).toEqual({
+            status: 'blocked',
+            message: 'This user is not authorized.',
+        });
     });
 
     it('should return a sanitized error result and diagnostic log when translation fails', async () => {
