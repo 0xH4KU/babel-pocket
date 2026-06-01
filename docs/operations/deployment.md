@@ -9,7 +9,7 @@ This fork keeps the original Babel deployment shape, but access and budget decis
 You need:
 
 - A Discord application with **User Install** enabled
-- Node.js `22.5+` for local/VPS installs, or Docker for container installs
+- Node.js `22.12+` for local/VPS installs, or Docker for container installs
 - A dashboard password that is not `admin`
 - At least one configured translation provider in the dashboard after startup
 

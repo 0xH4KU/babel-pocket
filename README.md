@@ -10,7 +10,7 @@ Right-click any message -> Apps -> **Babel Pocket** -> get a private translation
 You host the app, bring your own AI provider key, whitelist the Discord users who may use it, and set per-user budgets so friend sharing does not turn into an open-ended bill.
 
 [![License: GPL-3.0-only](https://img.shields.io/badge/License-GPL--3.0--only-blue.svg)](LICENSE)
-[![Node.js](https://img.shields.io/badge/Node.js-22.5%2B-green.svg)](https://nodejs.org)
+[![Node.js](https://img.shields.io/badge/Node.js-22.12%2B-green.svg)](https://nodejs.org)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue.svg)](https://www.typescriptlang.org/)
 [![discord.js](https://img.shields.io/badge/discord.js-v14-blue.svg)](https://discord.js.org)
 
@@ -52,7 +52,7 @@ Not included in the Babel Pocket product surface:
 
 ## Quick Start
 
-Prerequisites: Node.js `22.5+`, npm, a Discord application with a bot token, and a configured translation provider.
+Prerequisites: Node.js `22.12+`, npm, a Discord application with a bot token, and a configured translation provider.
 
 ```bash
 git clone https://github.com/0xH4KU/babel-pocket.git
