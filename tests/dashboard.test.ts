@@ -204,7 +204,11 @@ import { CooldownManager } from '../src/cooldown.js';
 import { TranslationLog } from '../src/log.js';
 import { TranslationRuntimeLimiter } from '../src/translation-runtime-limiter.js';
 import { _test as healthTest } from '../src/shared/health.js';
+import { createSqliteDatabase } from '../src/persistence/sqlite-database.js';
+import { DiscordUserProfileRepository } from '../src/modules/dashboard/discord-user-profile-repository.js';
+import { PendingUserInstallOwnerRepository } from '../src/modules/dashboard/pending-user-install-owner-repository.js';
 import type { Client } from 'discord.js';
+import type { DatabaseSync } from 'node:sqlite';
 
 interface TestResponse {
     status: number;
@@ -307,6 +311,9 @@ describe('Dashboard API', () => {
     let versionCheck: ReturnType<typeof vi.fn>;
     let runtimeLimiter: TranslationRuntimeLimiter;
     let log: TranslationLog;
+    let profileDb: DatabaseSync;
+    let userProfileRepository: DiscordUserProfileRepository;
+    let pendingUserInstallOwnerRepository: PendingUserInstallOwnerRepository;
 
     beforeAll(async () => {
         cache = new TranslationCache(100);
@@ -329,6 +336,43 @@ describe('Dashboard API', () => {
         });
         const cooldown = new CooldownManager(5);
         log = new TranslationLog(100);
+        profileDb = createSqliteDatabase(':memory:');
+        userProfileRepository = new DiscordUserProfileRepository({ db: profileDb });
+        pendingUserInstallOwnerRepository = new PendingUserInstallOwnerRepository({
+            db: profileDb,
+        });
+        userProfileRepository.upsertProfiles([
+            {
+                userId: 'user2',
+                username: 'haku',
+                globalName: 'Haku',
+                displayName: 'Haku',
+                avatarUrl: 'https://cdn.discordapp.com/avatars/user2/avatar.png',
+                fetchedAt: '2026-06-02T10:00:00.000Z',
+                lastSeenAt: null,
+            },
+            {
+                userId: 'user-1',
+                username: 'budget-user',
+                globalName: 'Budget User',
+                displayName: 'Budget User',
+                avatarUrl: 'https://cdn.discordapp.com/avatars/user-1/avatar.png',
+                fetchedAt: '2026-06-02T10:01:00.000Z',
+                lastSeenAt: null,
+            },
+            {
+                userId: 'pending-owner',
+                username: 'pending-user',
+                globalName: 'Pending User',
+                displayName: 'Pending User',
+                avatarUrl: 'https://cdn.discordapp.com/avatars/pending-owner/avatar.png',
+                fetchedAt: '2026-06-02T10:02:00.000Z',
+                lastSeenAt: null,
+            },
+        ]);
+        pendingUserInstallOwnerRepository.recordSeen('pending-owner', {
+            now: new Date('2026-06-02T10:03:00.000Z'),
+        });
         const guilds = [
             { id: 'guild-1', name: 'Guild One', iconURL: () => '', memberCount: 10 },
             { id: 'guild-2', name: 'Guild Two', iconURL: () => '', memberCount: 20 },
@@ -360,6 +404,8 @@ describe('Dashboard API', () => {
             healthCheck,
             versionCheck,
             sessionRepository: new InMemorySessionRepository(),
+            userProfileRepository,
+            pendingUserInstallOwnerRepository,
         });
 
         server = startDashboardServer(app, 0);
@@ -374,6 +420,9 @@ describe('Dashboard API', () => {
     afterAll(() => {
         stopDashboardApp(app);
         server?.close();
+        if (profileDb.isOpen) {
+            profileDb.close();
+        }
     });
 
     // --- Auth tests ---
@@ -655,6 +704,85 @@ describe('Dashboard API', () => {
         expect(clearRes.status).toBe(200);
         expect(clearRes.body).toEqual({ ok: true, mode: 'default' });
         expect(store.getUserBudget('user-1')).toBeNull();
+    });
+
+    it('should include Discord user profiles with per-user budgets', async () => {
+        const { store } = await import('../src/store.js');
+        const previousAllowedUserIds = store.get('allowedUserIds');
+
+        try {
+            store.set('allowedUserIds', ['user-1']);
+
+            const res = await request(server, 'GET', '/api/user-budgets', {
+                cookie: sessionCookie,
+            });
+
+            expect(res.status).toBe(200);
+            expect(res.body).toEqual(
+                expect.objectContaining({
+                    budgets: expect.objectContaining({
+                        'user-1': expect.objectContaining({
+                            budget: expect.any(Number),
+                            isCustom: expect.any(Boolean),
+                        }),
+                    }),
+                    profiles: expect.objectContaining({
+                        'user-1': expect.objectContaining({
+                            userId: 'user-1',
+                            username: 'budget-user',
+                            globalName: 'Budget User',
+                            displayName: 'Budget User',
+                            avatarUrl: 'https://cdn.discordapp.com/avatars/user-1/avatar.png',
+                        }),
+                    }),
+                }),
+            );
+        } finally {
+            store.set('allowedUserIds', previousAllowedUserIds);
+        }
+    });
+
+    it('should include pending user-install owners as disabled access users', async () => {
+        const { store } = await import('../src/store.js');
+        const previousAllowedUserIds = store.get('allowedUserIds');
+
+        try {
+            store.set('allowedUserIds', ['user-1']);
+
+            const res = await request(server, 'GET', '/api/user-budgets', {
+                cookie: sessionCookie,
+            });
+
+            expect(res.status).toBe(200);
+            expect(res.body).toEqual(
+                expect.objectContaining({
+                    budgets: expect.objectContaining({
+                        'user-1': expect.objectContaining({
+                            allowed: true,
+                            pending: false,
+                        }),
+                        'pending-owner': expect.objectContaining({
+                            allowed: false,
+                            pending: true,
+                            budget: expect.any(Number),
+                            isCustom: false,
+                        }),
+                    }),
+                    profiles: expect.objectContaining({
+                        'pending-owner': expect.objectContaining({
+                            userId: 'pending-owner',
+                            username: 'pending-user',
+                            globalName: 'Pending User',
+                            displayName: 'Pending User',
+                            avatarUrl:
+                                'https://cdn.discordapp.com/avatars/pending-owner/avatar.png',
+                        }),
+                    }),
+                }),
+            );
+        } finally {
+            store.set('allowedUserIds', previousAllowedUserIds);
+        }
     });
 
     it('should show custom user budget usage separately from the default user budget', async () => {
@@ -1292,6 +1420,31 @@ describe('Dashboard API', () => {
             cookie: sessionCookie,
         });
         expect((prefsRes.body!.prefs as Record<string, string>).user1).toBeUndefined();
+    });
+
+    it('should include Discord user profiles with user language preferences', async () => {
+        const res = await request(server, 'GET', '/api/user-prefs', {
+            cookie: sessionCookie,
+        });
+
+        expect(res.status).toBe(200);
+        expect(res.body).toEqual(
+            expect.objectContaining({
+                prefs: expect.objectContaining({
+                    user2: 'ko',
+                }),
+                count: expect.any(Number),
+                profiles: expect.objectContaining({
+                    user2: expect.objectContaining({
+                        userId: 'user2',
+                        username: 'haku',
+                        globalName: 'Haku',
+                        displayName: 'Haku',
+                        avatarUrl: 'https://cdn.discordapp.com/avatars/user2/avatar.png',
+                    }),
+                }),
+            }),
+        );
     });
 
     it('should manage per-guild glossary entries', async () => {

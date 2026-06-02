@@ -35,3 +35,47 @@ describe('resolveDatabasePath', () => {
         expect(resolveDatabasePath()).toBe(join(process.cwd(), 'data', 'babel.sqlite'));
     });
 });
+
+describe('createSqliteDatabase', () => {
+    it('should create the Discord user profile cache table', async () => {
+        const { createSqliteDatabase } = await import('../src/persistence/sqlite-database.js');
+        const db = createSqliteDatabase(':memory:');
+
+        try {
+            const row = db
+                .prepare(
+                    `
+                    SELECT name
+                    FROM sqlite_master
+                    WHERE type = 'table' AND name = 'discord_user_profiles'
+                `,
+                )
+                .get() as { name: string } | undefined;
+
+            expect(row?.name).toBe('discord_user_profiles');
+        } finally {
+            db.close();
+        }
+    });
+
+    it('should create the pending user-install owner table', async () => {
+        const { createSqliteDatabase } = await import('../src/persistence/sqlite-database.js');
+        const db = createSqliteDatabase(':memory:');
+
+        try {
+            const row = db
+                .prepare(
+                    `
+                    SELECT name
+                    FROM sqlite_master
+                    WHERE type = 'table' AND name = 'pending_user_install_owners'
+                `,
+                )
+                .get() as { name: string } | undefined;
+
+            expect(row?.name).toBe('pending_user_install_owners');
+        } finally {
+            db.close();
+        }
+    });
+});

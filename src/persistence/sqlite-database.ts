@@ -135,6 +135,40 @@ const MIGRATIONS: Migration[] = [
             `);
         },
     },
+    {
+        id: 4,
+        name: 'discord_user_profiles',
+        up(db) {
+            db.exec(`
+                CREATE TABLE IF NOT EXISTS discord_user_profiles (
+                    user_id TEXT PRIMARY KEY,
+                    username TEXT NOT NULL,
+                    global_name TEXT,
+                    display_name TEXT NOT NULL,
+                    avatar_url TEXT NOT NULL,
+                    fetched_at TEXT NOT NULL,
+                    last_seen_at TEXT
+                );
+            `);
+        },
+    },
+    {
+        id: 5,
+        name: 'pending_user_install_owners',
+        up(db) {
+            db.exec(`
+                CREATE TABLE IF NOT EXISTS pending_user_install_owners (
+                    user_id TEXT PRIMARY KEY,
+                    first_seen_at TEXT NOT NULL,
+                    last_seen_at TEXT NOT NULL,
+                    source TEXT NOT NULL
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_pending_user_install_owners_last_seen
+                    ON pending_user_install_owners (last_seen_at);
+            `);
+        },
+    },
 ];
 
 let sharedDatabase: DatabaseSync | null = null;
@@ -239,6 +273,8 @@ const STORE_TABLES = new Set([
     'user_budgets',
     'user_daily_usage',
     'user_usage_history',
+    'discord_user_profiles',
+    'pending_user_install_owners',
 ]);
 
 export function isSqliteStoreEmpty(db: DatabaseSync): boolean {

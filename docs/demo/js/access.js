@@ -3,6 +3,8 @@
  */
 
 let userBudgetData = {};
+let accessUserIds = [];
+let userProfiles = {};
 let allowedUsersPage = 1,
     allowedUsersPageSize = 15;
 let accessAllowedUserIdsDraft = [];
@@ -19,6 +21,56 @@ function sameUserIds(a, b) {
 
     if (left.length !== right.length) return false;
     return left.every((id, index) => id === right[index]);
+}
+
+function escapeHtml(value) {
+    return String(value ?? '').replace(/[&<>"']/g, (char) => {
+        const entities = {
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#39;',
+        };
+        return entities[char];
+    });
+}
+
+function userProfile(userId) {
+    return userProfiles[userId] || null;
+}
+
+function userDisplayName(userId) {
+    const profile = userProfile(userId);
+    return profile?.displayName || profile?.globalName || profile?.username || userId;
+}
+
+function userAvatar(userId) {
+    return userProfile(userId)?.avatarUrl || genAvatar(userDisplayName(userId));
+}
+
+function userSearchText(userId) {
+    const profile = userProfile(userId);
+    return [userId, profile?.displayName, profile?.globalName, profile?.username]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase();
+}
+
+function renderUserIdentity(userId, withAvatar = false) {
+    const displayName = escapeHtml(userDisplayName(userId));
+    const escapedUserId = escapeHtml(userId);
+    const avatar = withAvatar
+        ? `<img class="user-identity-avatar" src="${escapeHtml(userAvatar(userId))}" alt="">`
+        : '';
+
+    return `<span class="user-identity">
+        ${avatar}
+        <span class="user-identity-text">
+          <span class="user-identity-name">${displayName}</span>
+          <span class="user-identity-id">${escapedUserId}</span>
+        </span>
+      </span>`;
 }
 
 function updateAccessSaveState() {
@@ -45,6 +97,13 @@ function setAccessWhitelistDraft(allowedUserIds) {
     updateAccessSaveState();
 }
 
+function updateAccessUsersFromBudgetPayload(payload) {
+    userBudgetData = payload.budgets || payload;
+    const ids = normalizeUserIds(Object.keys(userBudgetData));
+    const merged = new Set([...ids, ...accessAllowedUserIdsDraft]);
+    accessUserIds = [...merged];
+}
+
 async function loadAccess() {
     try {
         const [cfgRes, budgetRes] = await Promise.all([api('/config'), api('/user-budgets')]);
@@ -54,7 +113,9 @@ async function loadAccess() {
             accessAllowedUserIdsDraft = [...currentConfig.allowedUserIds];
         }
         accessWhitelistLoaded = true;
-        userBudgetData = await budgetRes.json();
+        const budgetPayload = await budgetRes.json();
+        updateAccessUsersFromBudgetPayload(budgetPayload);
+        userProfiles = budgetPayload.profiles || {};
         renderAllowedUsers();
         updateAccessSaveState();
         loadUserPrefs();
@@ -73,6 +134,10 @@ async function saveUserWhitelist() {
         currentConfig.allowedUserIds = [...allowedUserIds];
         accessAllowedUserIdsDraft = [...allowedUserIds];
         accessWhitelistDirty = false;
+        const budgetRes = await api('/user-budgets');
+        const budgetPayload = await budgetRes.json();
+        updateAccessUsersFromBudgetPayload(budgetPayload);
+        userProfiles = { ...userProfiles, ...(budgetPayload.profiles || {}) };
         updateAccessSaveState();
         renderAllowedUsers();
         showToast('Access settings saved!');
@@ -85,12 +150,13 @@ function renderAllowedUsers() {
     const container = document.getElementById('user-access-list');
     if (!container) return;
 
-    const allowed = accessAllowedUserIdsDraft;
+    const allowed = accessUserIds;
+    const enabledIds = new Set(accessAllowedUserIdsDraft);
     const defaultBudget = currentConfig.defaultUserDailyBudgetUsd || 0;
 
     if (allowed.length === 0) {
         container.innerHTML =
-            '<div class="no-guilds">No users are whitelisted. Paste a Discord User ID below to add one.</div>';
+            '<div class="no-guilds">No users have requested access yet. Paste a Discord User ID below to add one.</div>';
         document.getElementById('user-access-pagination').innerHTML = '';
         return;
     }
@@ -103,6 +169,8 @@ function renderAllowedUsers() {
     container.innerHTML = pageItems
         .map((userId) => {
             const budgetData = userBudgetData[userId];
+            const enabled = enabledIds.has(userId);
+            const pending = Boolean(budgetData?.pending) && !enabled;
             const hasCustomBudget = budgetData && budgetData.isCustom;
             const effectiveBudget = hasCustomBudget ? budgetData.budget : defaultBudget;
             const budgetLabel = hasCustomBudget
@@ -113,10 +181,17 @@ function renderAllowedUsers() {
 
             return `<div class="guild-item guild-item-col">
       <div class="guild-item-row">
-        <img src="${genAvatar(userId)}" alt="">
-        <span class="guild-name" style="font-family:monospace;font-size:0.85rem">${userId}</span>
-        <span class="guild-members">whitelisted user</span>
-        <button class="btn-danger" onclick="removeAllowedUser('${userId}')">Remove</button>
+        <img src="${escapeHtml(userAvatar(userId))}" alt="">
+        <span class="guild-name">${renderUserIdentity(userId)}</span>
+        <span class="guild-members user-access-state">
+          <span class="badge ${enabled ? 'badge-green' : pending ? 'badge-yellow' : 'badge-red'}">
+            ${enabled ? 'Enabled' : pending ? 'Pending' : 'Disabled'}
+          </span>
+        </span>
+        <label class="toggle user-access-toggle" title="${enabled ? 'Disable this user' : 'Enable this user'}">
+          <input type="checkbox" ${enabled ? 'checked' : ''} onchange="setAllowedUserEnabled('${userId}', this.checked)">
+          <span class="slider"></span>
+        </label>
       </div>
       <div class="guild-budget-row">
         <div class="guild-budget-info">
@@ -170,16 +245,25 @@ function addAllowedUser() {
 
     nextAllowed.add(id);
     setAccessWhitelistDraft([...nextAllowed]);
-    allowedUsersPage = Math.max(Math.ceil(nextAllowed.size / allowedUsersPageSize), 1);
+    accessUserIds = normalizeUserIds([...accessUserIds, id]);
+    allowedUsersPage = Math.max(Math.ceil(accessUserIds.length / allowedUsersPageSize), 1);
     input.value = '';
     renderAllowedUsers();
     showToast('User added — click Save to apply');
 }
 
-function removeAllowedUser(id) {
-    setAccessWhitelistDraft(accessAllowedUserIdsDraft.filter((userId) => userId !== id));
+function setAllowedUserEnabled(id, enabled) {
+    const nextAllowed = new Set(accessAllowedUserIdsDraft);
+    if (enabled) {
+        nextAllowed.add(id);
+    } else {
+        nextAllowed.delete(id);
+    }
+
+    accessUserIds = normalizeUserIds([...accessUserIds, id]);
+    setAccessWhitelistDraft([...nextAllowed]);
     renderAllowedUsers();
-    showToast('User removed — click Save to apply');
+    showToast(`${enabled ? 'User enabled' : 'User disabled'} — click Save to apply`);
 }
 
 async function saveUserBudget(userId) {
@@ -204,7 +288,9 @@ async function saveUserBudget(userId) {
     if (res.ok) {
         showToast('User budget saved!');
         const budgetRes = await api('/user-budgets');
-        userBudgetData = await budgetRes.json();
+        const budgetPayload = await budgetRes.json();
+        updateAccessUsersFromBudgetPayload(budgetPayload);
+        userProfiles = { ...userProfiles, ...(budgetPayload.profiles || {}) };
         renderAllowedUsers();
     } else {
         showToast('Save failed', true);
@@ -220,7 +306,9 @@ async function resetUserBudget(userId) {
     if (res.ok) {
         showToast('Reset to default user budget');
         const budgetRes = await api('/user-budgets');
-        userBudgetData = await budgetRes.json();
+        const budgetPayload = await budgetRes.json();
+        updateAccessUsersFromBudgetPayload(budgetPayload);
+        userProfiles = { ...userProfiles, ...(budgetPayload.profiles || {}) };
         renderAllowedUsers();
     } else {
         showToast('Reset failed', true);
@@ -259,8 +347,9 @@ async function loadUserPrefs() {
     try {
         const res = await api('/user-prefs');
         if (!res.ok) return;
-        const { prefs, count } = await res.json();
+        const { prefs, count, profiles } = await res.json();
         allPrefsData = prefs;
+        userProfiles = { ...userProfiles, ...(profiles || {}) };
         document.getElementById('prefs-count').textContent =
             count + ' user(s) with custom settings';
         prefsPage = 1;
@@ -283,6 +372,7 @@ function filteredPrefsEntries() {
         const name = LANG_NAMES[lang] || lang;
         return (
             userId.toLowerCase().includes(query) ||
+            userSearchText(userId).includes(query) ||
             String(lang).toLowerCase().includes(query) ||
             String(name).toLowerCase().includes(query)
         );
@@ -316,15 +406,15 @@ function renderUserPrefs() {
     const pageEntries = entries.slice(start, start + prefsPageSize);
 
     let html = `<div class="table-scroll"><table class="data-table user-prefs-table"><thead><tr>
-    <th></th><th>User ID</th><th>Language</th><th></th>
+    <th></th><th>User</th><th>Language</th><th></th>
   </tr></thead><tbody>`;
     for (const [userId, lang] of pageEntries) {
         const name = LANG_NAMES[lang] || lang;
         const checked = selectedPrefUserIds.has(userId) ? 'checked' : '';
         html += `<tr>
       <td><input type="checkbox" onchange="togglePrefSelection('${userId}', this.checked)" ${checked}></td>
-      <td class="mono" style="font-size:0.8rem">${userId}</td>
-      <td>${name} (${lang})</td>
+      <td>${renderUserIdentity(userId, true)}</td>
+      <td>${escapeHtml(name)} (${escapeHtml(lang)})</td>
       <td><button class="btn-danger" onclick="deleteUserPref('${userId}')">Delete</button></td>
     </tr>`;
     }

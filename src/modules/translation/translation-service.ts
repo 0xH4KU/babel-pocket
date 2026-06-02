@@ -25,6 +25,7 @@ import {
     getDiscordTranslationCommandMessages,
 } from '../../shared/messages/discord-messages.js';
 import type { BotStats, GuildGlossaryEntry, TranslationResult } from '../../types.js';
+import { PendingUserInstallOwnerRepository } from '../dashboard/pending-user-install-owner-repository.js';
 
 type ServiceCommand = 'babel' | 'translate';
 type LangSource = 'option' | 'setlang' | 'locale' | 'auto';
@@ -65,6 +66,10 @@ interface UsageLike {
         outputTokens: number,
         scope?: { guildId?: string | null; userId?: string | null },
     ): void;
+}
+
+interface PendingUserInstallOwnerRepositoryLike {
+    recordSeen(userId: string): void;
 }
 
 interface Translator {
@@ -124,6 +129,7 @@ export interface TranslationServiceDeps {
     metrics?: AppMetricsCollector;
     runtimeLimiter?: TranslationRuntimeLimiter;
     logger?: StructuredLogger;
+    pendingUserInstallOwnerRepository?: PendingUserInstallOwnerRepositoryLike;
 }
 
 interface TargetLanguageDecision {
@@ -230,6 +236,7 @@ export function createTranslationService({
     metrics,
     runtimeLimiter,
     logger = appLogger.child({ component: 'translation_service' }),
+    pendingUserInstallOwnerRepository = new PendingUserInstallOwnerRepository(),
 }: TranslationServiceDeps): TranslationService {
     return {
         async process(request: TranslationServiceRequest): Promise<TranslationServiceResult> {
@@ -266,6 +273,9 @@ export function createTranslationService({
                 requestLogger.warn('translation.request.blocked', {
                     blockReason: billingUserId ? 'user_not_allowed' : 'guild_not_allowed',
                 });
+                if (billingUserId) {
+                    pendingUserInstallOwnerRepository.recordSeen(billingUserId);
+                }
                 return {
                     status: 'blocked',
                     message: billingUserId
