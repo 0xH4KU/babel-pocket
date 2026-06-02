@@ -300,6 +300,59 @@ const DEMO_USER_BUDGETS: Record<string, { budget: number; isCustom: boolean }> =
     '200000000000000004': { budget: 0, isCustom: true },
 };
 
+const DEMO_USER_PROFILES = {
+    '200000000000000001': {
+        userId: '200000000000000001',
+        username: 'alex',
+        globalName: 'Alex Chen',
+        displayName: 'Alex Chen',
+        avatarUrl:
+            'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2228%22 height=%2228%22%3E%3Crect width=%2228%22 height=%2228%22 rx=%2214%22 fill=%22%235865f2%22/%3E%3Ctext x=%2214%22 y=%2219%22 text-anchor=%22middle%22 fill=%22white%22 font-size=%2214%22%3EA%3C/text%3E%3C/svg%3E',
+        fetchedAt: '2026-06-01T12:00:00.000Z',
+        lastSeenAt: '2026-06-01T12:00:00.000Z',
+    },
+    '200000000000000002': {
+        userId: '200000000000000002',
+        username: 'mei',
+        globalName: 'Mei Lin',
+        displayName: 'Mei Lin',
+        avatarUrl:
+            'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2228%22 height=%2228%22%3E%3Crect width=%2228%22 height=%2228%22 rx=%2214%22 fill=%22%2322c55e%22/%3E%3Ctext x=%2214%22 y=%2219%22 text-anchor=%22middle%22 fill=%22white%22 font-size=%2214%22%3EM%3C/text%3E%3C/svg%3E',
+        fetchedAt: '2026-06-01T12:00:00.000Z',
+        lastSeenAt: '2026-06-01T12:00:00.000Z',
+    },
+    '200000000000000003': {
+        userId: '200000000000000003',
+        username: 'sora',
+        globalName: 'Sora',
+        displayName: 'Sora',
+        avatarUrl:
+            'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2228%22 height=%2228%22%3E%3Crect width=%2228%22 height=%2228%22 rx=%2214%22 fill=%22%23f59e0b%22/%3E%3Ctext x=%2214%22 y=%2219%22 text-anchor=%22middle%22 fill=%22white%22 font-size=%2214%22%3ES%3C/text%3E%3C/svg%3E',
+        fetchedAt: '2026-06-01T12:00:00.000Z',
+        lastSeenAt: '2026-06-01T12:00:00.000Z',
+    },
+    '200000000000000004': {
+        userId: '200000000000000004',
+        username: 'riley',
+        globalName: null,
+        displayName: 'riley',
+        avatarUrl:
+            'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2228%22 height=%2228%22%3E%3Crect width=%2228%22 height=%2228%22 rx=%2214%22 fill=%22%23ef4444%22/%3E%3Ctext x=%2214%22 y=%2219%22 text-anchor=%22middle%22 fill=%22white%22 font-size=%2214%22%3ER%3C/text%3E%3C/svg%3E',
+        fetchedAt: '2026-06-01T12:00:00.000Z',
+        lastSeenAt: '2026-06-01T12:00:00.000Z',
+    },
+    '200000000000000005': {
+        userId: '200000000000000005',
+        username: 'dani',
+        globalName: 'Dani',
+        displayName: 'Dani',
+        avatarUrl:
+            'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2228%22 height=%2228%22%3E%3Crect width=%2228%22 height=%2228%22 rx=%2214%22 fill=%22%238b5cf6%22/%3E%3Ctext x=%2214%22 y=%2219%22 text-anchor=%22middle%22 fill=%22white%22 font-size=%2214%22%3ED%3C/text%3E%3C/svg%3E',
+        fetchedAt: '2026-06-01T12:00:00.000Z',
+        lastSeenAt: '2026-06-01T12:00:00.000Z',
+    },
+};
+
 const DEMO_HISTORY = [
     { date: '2026-05-03', inputTokens: 220_100, outputTokens: 73_200, requests: 184, cost: 0.058 },
     { date: '2026-05-04', inputTokens: 261_900, outputTokens: 91_400, requests: 205, cost: 0.073 },
@@ -507,13 +560,17 @@ export function buildDashboardDemo({
 
     writeJson(join(fixtureDir, 'stats.json'), DEMO_STATS);
     writeJson(join(fixtureDir, 'config.json'), DEMO_CONFIG);
-    writeJson(join(fixtureDir, 'user-budgets.json'), DEMO_USER_BUDGETS);
+    writeJson(join(fixtureDir, 'user-budgets.json'), {
+        budgets: DEMO_USER_BUDGETS,
+        profiles: DEMO_USER_PROFILES,
+    });
     writeJson(join(fixtureDir, 'user-budget-details.json'), DEMO_USER_BUDGET_DETAILS);
     writeJson(join(fixtureDir, 'history.json'), DEMO_HISTORY);
     writeJson(join(fixtureDir, 'logs.json'), DEMO_LOGS);
     writeJson(join(fixtureDir, 'user-prefs.json'), {
         prefs: DEMO_USER_PREFS,
         count: Object.keys(DEMO_USER_PREFS).length,
+        profiles: DEMO_USER_PROFILES,
     });
     writeJson(join(fixtureDir, 'sessions.json'), {
         sessions: [

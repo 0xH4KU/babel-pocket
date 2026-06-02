@@ -27,6 +27,8 @@ import { applyConfigUpdateEffects } from '../config/config-runtime-effects.js';
 import { appLogger } from '../../shared/structured-logger.js';
 import { dashboardMessages } from '../../shared/messages/dashboard-messages.js';
 import { getVersionMetadata, getVersionMetadataWithUpdate } from '../../shared/version.js';
+import { DiscordUserProfileRepository } from './discord-user-profile-repository.js';
+import { resolveDiscordUserProfiles } from './discord-user-profile-resolver.js';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import type { DashboardDeps, StoreData, TranslationProviderMode } from '../../types.js';
@@ -612,6 +614,7 @@ export function createDashboardApp({
     openAiHealthCheck = checkOpenAiHealth,
     versionCheck = getVersionMetadataWithUpdate,
     sessionRepository,
+    userProfileRepository = new DiscordUserProfileRepository(),
     healthProbeCacheTtlMs = 5_000,
 }: DashboardDeps): express.Express {
     const app = express();
@@ -954,28 +957,38 @@ export function createDashboardApp({
         },
     );
 
-    app.get('/api/user-budgets', auth.requireAuth, (_req: Request, res: Response) => {
-        const userBudgets = userBudgetRepository.listBudgets();
-        const cfg = configRepository.getDashboardConfig();
-        const result: Record<string, { budget: number; isCustom: boolean }> = {};
+    app.get(
+        '/api/user-budgets',
+        auth.requireAuth,
+        asyncHandler(async (_req: Request, res: Response) => {
+            const userBudgets = userBudgetRepository.listBudgets();
+            const cfg = configRepository.getDashboardConfig();
+            const result: Record<string, { budget: number; isCustom: boolean }> = {};
 
-        for (const userId of cfg.allowedUserIds) {
-            const customBudget = userBudgets[userId];
-            result[userId] = {
-                budget: customBudget?.dailyBudgetUsd ?? cfg.defaultUserDailyBudgetUsd,
-                isCustom: customBudget !== undefined,
-            };
-        }
+            for (const userId of cfg.allowedUserIds) {
+                const customBudget = userBudgets[userId];
+                result[userId] = {
+                    budget: customBudget?.dailyBudgetUsd ?? cfg.defaultUserDailyBudgetUsd,
+                    isCustom: customBudget !== undefined,
+                };
+            }
 
-        for (const [userId, customBudget] of Object.entries(userBudgets)) {
-            result[userId] ??= {
-                budget: customBudget.dailyBudgetUsd,
-                isCustom: true,
-            };
-        }
+            for (const [userId, customBudget] of Object.entries(userBudgets)) {
+                result[userId] ??= {
+                    budget: customBudget.dailyBudgetUsd,
+                    isCustom: true,
+                };
+            }
 
-        res.json(result);
-    });
+            const profiles = await resolveDiscordUserProfiles({
+                client,
+                repository: userProfileRepository,
+                userIds: Object.keys(result),
+            });
+
+            res.json({ budgets: result, profiles });
+        }),
+    );
 
     app.post(
         '/api/user-budgets/:userId',
@@ -1092,13 +1105,24 @@ export function createDashboardApp({
         res.json(entries);
     });
 
-    app.get('/api/user-prefs', auth.requireAuth, (_req: Request, res: Response) => {
-        const prefs = userPreferenceRepository.listPreferences();
-        res.json({
-            prefs,
-            count: Object.keys(prefs).length,
-        });
-    });
+    app.get(
+        '/api/user-prefs',
+        auth.requireAuth,
+        asyncHandler(async (_req: Request, res: Response) => {
+            const prefs = userPreferenceRepository.listPreferences();
+            const profiles = await resolveDiscordUserProfiles({
+                client,
+                repository: userProfileRepository,
+                userIds: Object.keys(prefs),
+            });
+
+            res.json({
+                prefs,
+                count: Object.keys(prefs).length,
+                profiles,
+            });
+        }),
+    );
 
     app.post(
         '/api/user-prefs/batch-delete',

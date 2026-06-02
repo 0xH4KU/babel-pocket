@@ -13,6 +13,7 @@ import type { SessionRepository } from './modules/dashboard/auth/session-reposit
 import type { TranslationRuntimeLimiter } from './modules/translation/translation-runtime-limiter.js';
 import type { TranslationWebhookService } from './modules/translation/webhook-service.js';
 import type { VersionMetadataWithUpdate } from './shared/version.js';
+import type { DiscordUserProfileRepository } from './modules/dashboard/discord-user-profile-repository.js';
 
 // --- Provider ---
 
@@ -26,6 +27,16 @@ export interface GuildBudgetConfig {
 
 export interface UserBudgetConfig {
     dailyBudgetUsd: number;
+}
+
+export interface DiscordUserProfile {
+    userId: string;
+    username: string;
+    globalName: string | null;
+    displayName: string;
+    avatarUrl: string;
+    fetchedAt: string;
+    lastSeenAt: string | null;
 }
 
 export interface GuildGlossaryEntry {
@@ -199,6 +210,7 @@ export interface DashboardDeps {
     openAiHealthCheck?: () => Promise<OpenAiHealthStatus>;
     versionCheck?: (options?: { forceRefresh?: boolean }) => Promise<VersionMetadataWithUpdate>;
     sessionRepository?: SessionRepository;
+    userProfileRepository?: DiscordUserProfileRepository;
 }
 
 // --- Usage ---

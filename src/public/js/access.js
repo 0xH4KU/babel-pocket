@@ -3,6 +3,7 @@
  */
 
 let userBudgetData = {};
+let userProfiles = {};
 let allowedUsersPage = 1,
     allowedUsersPageSize = 15;
 let accessAllowedUserIdsDraft = [];
@@ -19,6 +20,56 @@ function sameUserIds(a, b) {
 
     if (left.length !== right.length) return false;
     return left.every((id, index) => id === right[index]);
+}
+
+function escapeHtml(value) {
+    return String(value ?? '').replace(/[&<>"']/g, (char) => {
+        const entities = {
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#39;',
+        };
+        return entities[char];
+    });
+}
+
+function userProfile(userId) {
+    return userProfiles[userId] || null;
+}
+
+function userDisplayName(userId) {
+    const profile = userProfile(userId);
+    return profile?.displayName || profile?.globalName || profile?.username || userId;
+}
+
+function userAvatar(userId) {
+    return userProfile(userId)?.avatarUrl || genAvatar(userDisplayName(userId));
+}
+
+function userSearchText(userId) {
+    const profile = userProfile(userId);
+    return [userId, profile?.displayName, profile?.globalName, profile?.username]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase();
+}
+
+function renderUserIdentity(userId, withAvatar = false) {
+    const displayName = escapeHtml(userDisplayName(userId));
+    const escapedUserId = escapeHtml(userId);
+    const avatar = withAvatar
+        ? `<img class="user-identity-avatar" src="${escapeHtml(userAvatar(userId))}" alt="">`
+        : '';
+
+    return `<span class="user-identity">
+        ${avatar}
+        <span class="user-identity-text">
+          <span class="user-identity-name">${displayName}</span>
+          <span class="user-identity-id">${escapedUserId}</span>
+        </span>
+      </span>`;
 }
 
 function updateAccessSaveState() {
@@ -54,7 +105,9 @@ async function loadAccess() {
             accessAllowedUserIdsDraft = [...currentConfig.allowedUserIds];
         }
         accessWhitelistLoaded = true;
-        userBudgetData = await budgetRes.json();
+        const budgetPayload = await budgetRes.json();
+        userBudgetData = budgetPayload.budgets || budgetPayload;
+        userProfiles = budgetPayload.profiles || {};
         renderAllowedUsers();
         updateAccessSaveState();
         loadUserPrefs();
@@ -113,8 +166,8 @@ function renderAllowedUsers() {
 
             return `<div class="guild-item guild-item-col">
       <div class="guild-item-row">
-        <img src="${genAvatar(userId)}" alt="">
-        <span class="guild-name" style="font-family:monospace;font-size:0.85rem">${userId}</span>
+        <img src="${escapeHtml(userAvatar(userId))}" alt="">
+        <span class="guild-name">${renderUserIdentity(userId)}</span>
         <span class="guild-members">whitelisted user</span>
         <button class="btn-danger" onclick="removeAllowedUser('${userId}')">Remove</button>
       </div>
@@ -204,7 +257,9 @@ async function saveUserBudget(userId) {
     if (res.ok) {
         showToast('User budget saved!');
         const budgetRes = await api('/user-budgets');
-        userBudgetData = await budgetRes.json();
+        const budgetPayload = await budgetRes.json();
+        userBudgetData = budgetPayload.budgets || budgetPayload;
+        userProfiles = { ...userProfiles, ...(budgetPayload.profiles || {}) };
         renderAllowedUsers();
     } else {
         showToast('Save failed', true);
@@ -220,7 +275,9 @@ async function resetUserBudget(userId) {
     if (res.ok) {
         showToast('Reset to default user budget');
         const budgetRes = await api('/user-budgets');
-        userBudgetData = await budgetRes.json();
+        const budgetPayload = await budgetRes.json();
+        userBudgetData = budgetPayload.budgets || budgetPayload;
+        userProfiles = { ...userProfiles, ...(budgetPayload.profiles || {}) };
         renderAllowedUsers();
     } else {
         showToast('Reset failed', true);
@@ -259,8 +316,9 @@ async function loadUserPrefs() {
     try {
         const res = await api('/user-prefs');
         if (!res.ok) return;
-        const { prefs, count } = await res.json();
+        const { prefs, count, profiles } = await res.json();
         allPrefsData = prefs;
+        userProfiles = { ...userProfiles, ...(profiles || {}) };
         document.getElementById('prefs-count').textContent =
             count + ' user(s) with custom settings';
         prefsPage = 1;
@@ -283,6 +341,7 @@ function filteredPrefsEntries() {
         const name = LANG_NAMES[lang] || lang;
         return (
             userId.toLowerCase().includes(query) ||
+            userSearchText(userId).includes(query) ||
             String(lang).toLowerCase().includes(query) ||
             String(name).toLowerCase().includes(query)
         );
@@ -316,15 +375,15 @@ function renderUserPrefs() {
     const pageEntries = entries.slice(start, start + prefsPageSize);
 
     let html = `<div class="table-scroll"><table class="data-table user-prefs-table"><thead><tr>
-    <th></th><th>User ID</th><th>Language</th><th></th>
+    <th></th><th>User</th><th>Language</th><th></th>
   </tr></thead><tbody>`;
     for (const [userId, lang] of pageEntries) {
         const name = LANG_NAMES[lang] || lang;
         const checked = selectedPrefUserIds.has(userId) ? 'checked' : '';
         html += `<tr>
       <td><input type="checkbox" onchange="togglePrefSelection('${userId}', this.checked)" ${checked}></td>
-      <td class="mono" style="font-size:0.8rem">${userId}</td>
-      <td>${name} (${lang})</td>
+      <td>${renderUserIdentity(userId, true)}</td>
+      <td>${escapeHtml(name)} (${escapeHtml(lang)})</td>
       <td><button class="btn-danger" onclick="deleteUserPref('${userId}')">Delete</button></td>
     </tr>`;
     }
