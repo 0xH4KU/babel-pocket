@@ -145,6 +145,7 @@ function createService({
     glossaryRepository = createGlossaryRepositoryMock(),
     loggerState = createStructuredLoggerMock(),
     runtimeLimiter,
+    pendingUserInstallOwnerRepository,
 }: {
     storeOverrides?: Partial<StoreData>;
     translator?: ReturnType<typeof vi.fn>;
@@ -152,6 +153,7 @@ function createService({
     glossaryRepository?: ReturnType<typeof createGlossaryRepositoryMock>;
     loggerState?: ReturnType<typeof createStructuredLoggerMock>;
     runtimeLimiter?: TranslationRuntimeLimiter;
+    pendingUserInstallOwnerRepository?: { recordSeen: ReturnType<typeof vi.fn> };
 } = {}) {
     const cache = new TranslationCache(100);
     const cooldown = new CooldownManager(0);
@@ -173,6 +175,7 @@ function createService({
         translator,
         metrics,
         runtimeLimiter,
+        pendingUserInstallOwnerRepository,
         logger: loggerState.logger as never,
     });
 
@@ -526,6 +529,36 @@ describe('TranslationService', () => {
             status: 'blocked',
             message: 'This user is not authorized.',
         });
+    });
+
+    it('should record unauthorized user-install owners as pending access users', async () => {
+        const pendingUserInstallOwnerRepository = {
+            recordSeen: vi.fn(),
+        };
+        const { service } = createService({
+            storeOverrides: {
+                allowedGuildIds: [],
+                allowedUserIds: ['user-allowed'],
+            },
+            pendingUserInstallOwnerRepository,
+        });
+
+        const result = await service.process({
+            command: 'babel',
+            commandLabel: 'Babel Pocket (context menu)',
+            guildId: null,
+            userId: 'interaction-user',
+            billingUserId: 'install-owner',
+            userTag: 'actor#0001',
+            locale: 'en-US',
+            text: 'Hello',
+        });
+
+        expect(result).toEqual({
+            status: 'blocked',
+            message: 'This user is not authorized.',
+        });
+        expect(pendingUserInstallOwnerRepository.recordSeen).toHaveBeenCalledWith('install-owner');
     });
 
     it('should return a sanitized error result and diagnostic log when translation fails', async () => {

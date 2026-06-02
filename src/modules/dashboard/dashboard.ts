@@ -29,6 +29,7 @@ import { dashboardMessages } from '../../shared/messages/dashboard-messages.js';
 import { getVersionMetadata, getVersionMetadataWithUpdate } from '../../shared/version.js';
 import { DiscordUserProfileRepository } from './discord-user-profile-repository.js';
 import { resolveDiscordUserProfiles } from './discord-user-profile-resolver.js';
+import { PendingUserInstallOwnerRepository } from './pending-user-install-owner-repository.js';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import type { DashboardDeps, StoreData, TranslationProviderMode } from '../../types.js';
@@ -615,6 +616,7 @@ export function createDashboardApp({
     versionCheck = getVersionMetadataWithUpdate,
     sessionRepository,
     userProfileRepository = new DiscordUserProfileRepository(),
+    pendingUserInstallOwnerRepository = new PendingUserInstallOwnerRepository(),
     healthProbeCacheTtlMs = 5_000,
 }: DashboardDeps): express.Express {
     const app = express();
@@ -963,20 +965,23 @@ export function createDashboardApp({
         asyncHandler(async (_req: Request, res: Response) => {
             const userBudgets = userBudgetRepository.listBudgets();
             const cfg = configRepository.getDashboardConfig();
-            const result: Record<string, { budget: number; isCustom: boolean }> = {};
+            const allowedUserIds = new Set(cfg.allowedUserIds);
+            const pendingUserIds = new Set(pendingUserInstallOwnerRepository.listUserIds());
+            const userIds = [
+                ...new Set([...cfg.allowedUserIds, ...pendingUserIds, ...Object.keys(userBudgets)]),
+            ];
+            const result: Record<
+                string,
+                { budget: number; isCustom: boolean; allowed: boolean; pending: boolean }
+            > = {};
 
-            for (const userId of cfg.allowedUserIds) {
+            for (const userId of userIds) {
                 const customBudget = userBudgets[userId];
                 result[userId] = {
                     budget: customBudget?.dailyBudgetUsd ?? cfg.defaultUserDailyBudgetUsd,
                     isCustom: customBudget !== undefined,
-                };
-            }
-
-            for (const [userId, customBudget] of Object.entries(userBudgets)) {
-                result[userId] ??= {
-                    budget: customBudget.dailyBudgetUsd,
-                    isCustom: true,
+                    allowed: allowedUserIds.has(userId),
+                    pending: pendingUserIds.has(userId) && !allowedUserIds.has(userId),
                 };
             }
 
