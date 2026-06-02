@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="assets/babel-logo-transparent.png" alt="Babel Pocket" width="120">
+<img src="assets/babel-pocket-logo-transparent.png" alt="Babel Pocket" width="120">
 
 # Babel Pocket
 
@@ -13,6 +13,18 @@ You host the app, bring your own AI provider key, whitelist the Discord users wh
 [![Node.js](https://img.shields.io/badge/Node.js-22.12%2B-green.svg)](https://nodejs.org)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue.svg)](https://www.typescriptlang.org/)
 [![discord.js](https://img.shields.io/badge/discord.js-v14-blue.svg)](https://discord.js.org)
+[![Version](https://img.shields.io/badge/version-0.1.0-brightgreen.svg)](package.json)
+[![CI](https://github.com/0xH4KU/babel-discord-translator/actions/workflows/ci.yml/badge.svg)](https://github.com/0xH4KU/babel-pocket/actions)
+
+[![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/deploy/babel-pocket?referralCode=euhy-o&utm_medium=integration&utm_source=template&utm_campaign=generic)
+
+[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/0xh4ku)
+
+[Live Dashboard Demo](https://0xh4ku.github.io/babel-discord-translator/demo/) ·
+[Deployment Guide](docs/operations/deployment.md) ·
+[Railway](docs/operations/railway.md) ·
+[Docker Ops](docs/operations/docker.md) ·
+[Changelog](CHANGELOG.md)
 
 </div>
 

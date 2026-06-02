@@ -13,6 +13,8 @@ The repository is Railway-ready:
 - Babel Pocket binds the dashboard to `DASHBOARD_HOST`, which defaults to `0.0.0.0`.
 - The Docker image stores SQLite data under `/app/data` when `BABEL_DB_PATH=/app/data/babel.sqlite`.
 
+[![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/deploy/babel-pocket?referralCode=euhy-o&utm_medium=integration&utm_source=template&utm_campaign=generic)
+
 ## Required Variables
 
 Set these in Railway service variables:
