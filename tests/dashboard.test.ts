@@ -326,12 +326,12 @@ describe('Dashboard API', () => {
         });
         healthCheck = vi.fn().mockResolvedValue({ healthy: true, latencyMs: 24 });
         versionCheck = vi.fn().mockResolvedValue({
-            version: '0.1.2',
+            version: '0.1.0',
             repositoryUrl: 'https://github.com/0xH4KU/babel-pocket',
             update: {
                 status: 'current',
-                latestVersion: '0.1.2',
-                latestUrl: 'https://github.com/0xH4KU/babel-pocket/releases/tag/v0.1.2',
+                latestVersion: '0.1.0',
+                latestUrl: 'https://github.com/0xH4KU/babel-pocket/releases/tag/v0.1.0',
             },
         });
         const cooldown = new CooldownManager(5);
@@ -888,12 +888,12 @@ describe('Dashboard API', () => {
 
         expect(res.status).toBe(200);
         expect(res.body).toEqual({
-            version: '0.1.2',
+            version: '0.1.0',
             repositoryUrl: 'https://github.com/0xH4KU/babel-pocket',
             update: {
                 status: 'current',
-                latestVersion: '0.1.2',
-                latestUrl: 'https://github.com/0xH4KU/babel-pocket/releases/tag/v0.1.2',
+                latestVersion: '0.1.0',
+                latestUrl: 'https://github.com/0xH4KU/babel-pocket/releases/tag/v0.1.0',
             },
         });
         expect(versionCheck).toHaveBeenCalled();
@@ -902,7 +902,7 @@ describe('Dashboard API', () => {
     it('should force-refresh release metadata for authenticated admins with CSRF', async () => {
         versionCheck.mockClear();
         versionCheck.mockResolvedValueOnce({
-            version: '0.1.2',
+            version: '0.1.0',
             repositoryUrl: 'https://github.com/0xH4KU/babel-pocket',
             update: {
                 status: 'outdated',
@@ -918,7 +918,7 @@ describe('Dashboard API', () => {
 
         expect(res.status).toBe(200);
         expect(res.body).toEqual({
-            version: '0.1.2',
+            version: '0.1.0',
             repositoryUrl: 'https://github.com/0xH4KU/babel-pocket',
             update: {
                 status: 'outdated',
@@ -975,7 +975,7 @@ describe('Dashboard API', () => {
             expect(res.status).toBe(200);
             expect(res.headers['content-type']).toContain('text/plain');
             expect(res.text).toContain(
-                'babel_app_version_info{version="0.1.2",repository_url="https://github.com/0xH4KU/babel-pocket"} 1',
+                'babel_app_version_info{version="0.1.0",repository_url="https://github.com/0xH4KU/babel-pocket"} 1',
             );
             expect(res.text).toContain('babel_translations_total');
             expect(res.text).toContain('babel_translation_failures_total');

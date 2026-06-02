@@ -474,12 +474,12 @@ const DEMO_USER_PREFS = {
 };
 
 const DEMO_VERSION = {
-    version: '0.1.2',
+    version: '0.1.0',
     repositoryUrl: 'https://github.com/0xH4KU/babel-pocket',
     update: {
         status: 'current',
-        latestVersion: '0.1.2',
-        latestUrl: 'https://github.com/0xH4KU/babel-pocket/releases/tag/v0.1.2',
+        latestVersion: '0.1.0',
+        latestUrl: 'https://github.com/0xH4KU/babel-pocket/releases/tag/v0.1.0',
     },
 };
 

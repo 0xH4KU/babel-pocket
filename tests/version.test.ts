@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
+    getVersionMetadata,
     getVersionMetadataWithUpdate,
     getVersionUpdateStatus,
     _test,
@@ -14,6 +15,13 @@ function jsonResponse(body: unknown, init: ResponseInit = {}): Response {
 }
 
 describe('version metadata', () => {
+    it('should expose the Babel Pocket application version', () => {
+        expect(getVersionMetadata()).toEqual({
+            version: '0.1.0',
+            repositoryUrl: 'https://github.com/0xH4KU/babel-pocket',
+        });
+    });
+
     it('should report outdated when the latest release tag is newer', async () => {
         _test.resetVersionUpdateCache();
         const fetchImpl = vi.fn(async () =>
@@ -24,7 +32,7 @@ describe('version metadata', () => {
         );
 
         const update = await getVersionUpdateStatus({
-            currentVersion: '0.1.2',
+            currentVersion: '0.1.0',
             fetchImpl,
             latestReleaseUrl: 'https://example.test/releases/latest',
             cacheTtlMs: 0,
@@ -47,25 +55,25 @@ describe('version metadata', () => {
         _test.resetVersionUpdateCache();
         const fetchImpl = vi.fn(async () =>
             jsonResponse({
-                tag_name: 'v0.1.2',
-                html_url: 'https://github.com/0xH4KU/babel-pocket/releases/tag/v0.1.2',
+                tag_name: 'v0.1.0',
+                html_url: 'https://github.com/0xH4KU/babel-pocket/releases/tag/v0.1.0',
             }),
         );
 
         const metadata = await getVersionMetadataWithUpdate({
-            currentVersion: '0.1.2',
+            currentVersion: '0.1.0',
             fetchImpl,
             latestReleaseUrl: 'https://example.test/releases/latest',
             cacheTtlMs: 0,
         });
 
         expect(metadata).toEqual({
-            version: '0.1.2',
+            version: '0.1.0',
             repositoryUrl: 'https://github.com/0xH4KU/babel-pocket',
             update: {
                 status: 'current',
-                latestVersion: '0.1.2',
-                latestUrl: 'https://github.com/0xH4KU/babel-pocket/releases/tag/v0.1.2',
+                latestVersion: '0.1.0',
+                latestUrl: 'https://github.com/0xH4KU/babel-pocket/releases/tag/v0.1.0',
             },
         });
     });
@@ -79,8 +87,8 @@ describe('version metadata', () => {
             .fn()
             .mockResolvedValueOnce(
                 jsonResponse({
-                    tag_name: 'v0.1.2',
-                    html_url: 'https://github.com/0xH4KU/babel-pocket/releases/tag/v0.1.2',
+                    tag_name: 'v0.1.0',
+                    html_url: 'https://github.com/0xH4KU/babel-pocket/releases/tag/v0.1.0',
                 }),
             )
             .mockResolvedValueOnce(
@@ -92,13 +100,13 @@ describe('version metadata', () => {
 
         try {
             const first = await getVersionUpdateStatus({
-                currentVersion: '0.1.2',
+                currentVersion: '0.1.0',
                 fetchImpl,
                 latestReleaseUrl: 'https://example.test/releases/latest',
             });
 
             const second = await getVersionUpdateStatus({
-                currentVersion: '0.1.2',
+                currentVersion: '0.1.0',
                 fetchImpl,
                 latestReleaseUrl: 'https://example.test/releases/latest',
                 forceRefresh: true,
@@ -106,8 +114,8 @@ describe('version metadata', () => {
 
             expect(first).toEqual({
                 status: 'current',
-                latestVersion: '0.1.2',
-                latestUrl: 'https://github.com/0xH4KU/babel-pocket/releases/tag/v0.1.2',
+                latestVersion: '0.1.0',
+                latestUrl: 'https://github.com/0xH4KU/babel-pocket/releases/tag/v0.1.0',
             });
             expect(second).toEqual({
                 status: 'outdated',
@@ -127,7 +135,7 @@ describe('version metadata', () => {
         );
 
         const update = await getVersionUpdateStatus({
-            currentVersion: '0.1.2',
+            currentVersion: '0.1.0',
             fetchImpl,
             latestReleaseUrl: 'https://example.test/releases/latest',
             cacheTtlMs: 0,
