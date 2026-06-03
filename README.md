@@ -1,3 +1,12 @@
+> [!IMPORTANT]
+> **This repository has been deprecated and moved.**
+> 
+> To improve maintainability and share core logic, this project has been refactored and merged into a monorepo. 
+> 
+> 🚀 **Please visit the new repository:** [babel-discord-translator](https://github.com/0xH4KU/babel-discord-translator)
+> 
+> This repository is now archived and read-only. No further updates, bug fixes, or new features will be provided here. Please open all new issues and pull requests in the new repository.
+
 <div align="center">
 
 <img src="assets/babel-pocket-logo-transparent.png" alt="Babel Pocket" width="120">
